@@ -14,7 +14,9 @@ The parent Codex session must use Codex-native controls directly:
   `close_agent` when those tools are available
 - inspection through `/agent`, `/diff`, `/review`, `/status`, and `/mcp`
 - permission steering through `/permissions`
-- durable run state through Markdown/JSON artifacts
+- durable run state through Markdown/JSON artifacts under the Codex Ultracode
+  log root
+- improvement metrics through `metrics.json` and `summary.jsonl`
 
 Not every Codex surface is visible in every client or account. Availability can
 vary across CLI, app, IDE extension, feature flags, installed plugins/MCP
@@ -61,7 +63,7 @@ docs and user-facing reports.
 classify task:
   type, risk, blast radius, verification, delegation
 
-create temp run root:
+create Codex Ultracode log root:
   <run-root>/<slug>/
     plan.md
     orchestration.md
@@ -70,6 +72,7 @@ create temp run root:
     results/
     integration.md
     final-report.md
+    metrics.json
 
 write plan and packets:
   keep parent critical path local
@@ -97,12 +100,13 @@ integrate:
   read every result file and agent final answer
   reject unevidenced claims
   resolve conflicts from source files/tests/docs
-  update integration.md and state.json
+  update integration.md, state.json, and metrics.json
 
 verify:
   run required tests/checks
   run adversarial review for non-trivial claims
   write final-report.md
+  append one privacy-safe record to summary.jsonl when the Codex log root is writable
 ```
 
 ## Prompt templates
@@ -225,8 +229,27 @@ artifacts, validation, and explicit `spawn_agent` / `wait_agent` orchestration.
 ## Artifacts
 
 Write `plan.md`, `orchestration.md`, `state.json`, `packets/`, `results/`,
-`integration.md`, and `final-report.md` under the temp run root from
+`integration.md`, `final-report.md`, and `metrics.json` under the run root from
 `packet-schema.md`.
+
+For Codex, prefer:
+
+```text
+${CODEX_HOME:-$HOME/.codex}/log/ultracode/<workspace-key>/<run-id>/
+```
+
+Do not write into Codex internal session files, `history.jsonl`,
+`session_index.jsonl`, or SQLite databases. Treat `log/ultracode` as the
+skill-owned area for durable workflow artifacts and improvement metrics.
+
+Append one compact run summary to:
+
+```text
+${CODEX_HOME:-$HOME/.codex}/log/ultracode/summary.jsonl
+```
+
+If the Codex log root is unavailable, fall back to the temp root documented in
+`packet-schema.md` and record the reason in `state.json` and `metrics.json`.
 
 At minimum, `state.json` should record:
 
@@ -253,3 +276,59 @@ At minimum, `state.json` should record:
   ]
 }
 ```
+
+At minimum, `metrics.json` should record:
+
+```json
+{
+  "schema_version": 1,
+  "run_id": "same-as-state-run-id",
+  "slug": "same-as-state-slug",
+  "workspace_key": "workspace-key",
+  "status": "executing",
+  "mode": "delegated",
+  "risk_level": "medium",
+  "objective_kind": "implementation",
+  "artifact_root": "absolute path to the run directory",
+  "delegation": {
+    "native_agent_used": true,
+    "agent_count": 0,
+    "wave_count": 0,
+    "fan_out_shape": "mixed",
+    "agent_failures": 0,
+    "agent_timeouts": 0
+  },
+  "packets": {
+    "total": 0,
+    "complete": 0,
+    "blocked": 0,
+    "skipped": 0,
+    "timeout": 0
+  },
+  "verification": {
+    "checks_total": 0,
+    "checks_pass": 0,
+    "checks_fail": 0,
+    "checks_skipped": 0,
+    "checks_timeout": 0,
+    "tests_total": null,
+    "tests_passed": null,
+    "tests_failed": null
+  },
+  "token_usage": {
+    "available": false,
+    "source": null,
+    "input_tokens": null,
+    "output_tokens": null,
+    "cached_input_tokens": null,
+    "total_tokens": null
+  },
+  "timing": {
+    "available": false,
+    "elapsed_ms": null
+  }
+}
+```
+
+Use `null` when Codex does not expose reliable token or timing data. Do not
+guess token usage from file size or message count.

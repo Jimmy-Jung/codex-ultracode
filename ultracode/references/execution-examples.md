@@ -193,5 +193,5 @@ Mode: same mode as the original run.
 Expected behavior:
 
 - For Codex, keep the original `slug`/`run_id`, read `state.json`, and continue from the first incomplete packet or verification check.
-- Reuse the original temp run directory if it still exists. If it was cleaned and no saved artifacts exist, start a new run and state that prior artifacts were unavailable.
+- Reuse the original Codex Ultracode log directory when it exists. If artifacts are unavailable, start a new run and state that prior artifacts were unavailable.
 - Do not claim Claude Workflow journal/cache replay in Codex. On Claude Code only, a saved Workflow runtime may replay completed agent calls according to host behavior.

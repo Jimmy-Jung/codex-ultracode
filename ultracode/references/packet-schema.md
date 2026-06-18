@@ -15,6 +15,23 @@ Use this reference when creating or validating workflow artifacts.
     01-discovery.md
   integration.md
   final-report.md
+  metrics.json
+```
+
+For Codex runs, prefer this persistent root:
+
+```text
+${CODEX_HOME:-$HOME/.codex}/log/ultracode/<workspace-key>/<run-id>/
+```
+
+Do not write into Codex internal session files, `history.jsonl`,
+`session_index.jsonl`, or SQLite databases. Ultracode owns only its
+`log/ultracode` subtree.
+
+Append one compact record per run to:
+
+```text
+${CODEX_HOME:-$HOME/.codex}/log/ultracode/summary.jsonl
 ```
 
 Optional high-risk files:
@@ -28,7 +45,7 @@ Optional high-risk files:
 
 ## plan.md
 
-`<run-root>` should be a host or OS temp directory outside the workspace, such as `${TMPDIR:-/tmp}/ultracode/<workspace-key>/`. Use `.workflow/ultracode/`, `.context/ultracode/`, or another workspace scratch directory only when the user or project instructions explicitly request persistent workspace artifacts.
+`<run-root>` should be outside the workspace. For Codex, prefer `${CODEX_HOME:-$HOME/.codex}/log/ultracode/<workspace-key>/<run-id>/` so artifacts survive temp cleanup and can support later skill-improvement analysis. Use `${TMPDIR:-/tmp}/ultracode/<workspace-key>/<run-id>/` only when the Codex log root is unavailable, the user requests temp-only artifacts, or host policy blocks writing under the Codex home directory. Use `.workflow/ultracode/`, `.context/ultracode/`, or another workspace scratch directory only when the user or project instructions explicitly request persistent workspace artifacts.
 
 Required sections:
 
@@ -156,6 +173,113 @@ Required keys:
 }
 ```
 
+## metrics.json
+
+`metrics.json` is for future skill-improvement analysis. Keep it structured,
+privacy-safe, and free of secrets or raw long prompts.
+
+Required keys:
+
+```json
+{
+  "schema_version": 1,
+  "run_id": "stable host run id, or reuse slug",
+  "slug": "string",
+  "workspace_key": "filesystem-safe workspace key",
+  "created_at": "ISO-8601 string",
+  "completed_at": null,
+  "status": "planning|executing|complete|blocked|cancelled",
+  "mode": "direct|workflow|delegated",
+  "risk_level": "low|medium|high|unknown",
+  "objective_kind": "debug|implementation|review|docs|research|migration|qa|other",
+  "artifact_root": "absolute path to this run directory",
+  "summary_record_path": "absolute path to summary.jsonl or null",
+  "delegation": {
+    "native_agent_used": false,
+    "agent_count": 0,
+    "wave_count": 0,
+    "fan_out_shape": "pipeline|parallel|mixed|none",
+    "agent_failures": 0,
+    "agent_timeouts": 0
+  },
+  "packets": {
+    "total": 0,
+    "complete": 0,
+    "blocked": 0,
+    "skipped": 0,
+    "timeout": 0
+  },
+  "verification": {
+    "checks_total": 0,
+    "checks_pass": 0,
+    "checks_fail": 0,
+    "checks_skipped": 0,
+    "checks_timeout": 0,
+    "tests_total": null,
+    "tests_passed": null,
+    "tests_failed": null
+  },
+  "review": {
+    "reviewer_agents": 0,
+    "findings_total": null,
+    "findings_accepted": null,
+    "findings_rejected": null
+  },
+  "token_usage": {
+    "available": false,
+    "source": null,
+    "input_tokens": null,
+    "output_tokens": null,
+    "cached_input_tokens": null,
+    "total_tokens": null
+  },
+  "timing": {
+    "available": false,
+    "elapsed_ms": null
+  },
+  "outcome": {
+    "changed_files_count": null,
+    "completed_user_goal": null,
+    "residual_risk_count": null,
+    "skipped_required_checks": 0
+  },
+  "notes": ""
+}
+```
+
+Use `null` instead of guessing. Token usage, wall-clock time, and reviewer
+finding counts are optional unless the host exposes reliable data.
+
+## summary.jsonl
+
+Append one single-line JSON object per run. It should be small enough to scan
+across many runs and must not include raw prompts, source code, secrets, or
+long agent output.
+
+Recommended fields:
+
+```json
+{
+  "schema_version": 1,
+  "run_id": "string",
+  "slug": "string",
+  "workspace_key": "string",
+  "completed_at": "ISO-8601 string or null",
+  "status": "complete|blocked|cancelled|executing",
+  "mode": "direct|workflow|delegated",
+  "risk_level": "low|medium|high|unknown",
+  "objective_kind": "debug|implementation|review|docs|research|migration|qa|other",
+  "agent_count": 0,
+  "packet_total": 0,
+  "checks_total": 0,
+  "checks_pass": 0,
+  "tests_passed": null,
+  "token_total": null,
+  "elapsed_ms": null,
+  "artifact_root": "absolute path to run directory"
+}
+```
+
 Allowed run status values:
 
 - `planning`
@@ -174,6 +298,8 @@ Allowed packet status values:
 - `complete`
 - `blocked`
 - `skipped`
+- `timeout`
+- `attempted-timeout`
 
 Allowed verification-check status values (used by `verification.checks[].status` and the final audit):
 
@@ -182,6 +308,9 @@ Allowed verification-check status values (used by `verification.checks[].status`
 - `fail`
 - `trust-prior`
 - `skipped`
+- `not-run`
+- `timeout`
+- `attempted-timeout`
 
 ## Packet files
 

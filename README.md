@@ -95,7 +95,7 @@ flowchart TD
 - **부모 세션:** 작업 분류, 계획, 통합, 최종 판단을 담당합니다.
 - **packet:** 조사, 구현, 검증처럼 독립적으로 수행할 수 있는 작은 작업 단위입니다.
 - **하위 에이전트:** packet을 받아 독립적으로 조사하거나 검증합니다. 쓸 수 없으면 부모 세션이 단계별로 대체 실행합니다.
-- **artifact:** `plan.md`, `orchestration.md`, `state.json`, packet/result 파일처럼 실행 과정을 남기는 기록입니다.
+- **artifact:** `plan.md`, `orchestration.md`, `state.json`, packet/result 파일처럼 실행 과정을 남기는 기록입니다. Codex에서는 기본적으로 `${CODEX_HOME:-$HOME/.codex}/log/ultracode/` 아래에 남기고, 추후 개선 분석을 위해 `metrics.json`과 `summary.jsonl`도 함께 기록합니다.
 - **반박 검증:** 나온 결론이 틀렸다고 가정하고 다시 확인하는 단계입니다.
 
 Codex에서 native subagent가 가능하면 `Delegated mode`가 가장 완전한 형태입니다.

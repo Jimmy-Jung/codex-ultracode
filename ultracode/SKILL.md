@@ -207,16 +207,25 @@ Scale breadth to the ask, not the verification floor. "find any bugs" → a smal
 
 Run root rule:
 
-- Default to a host or OS temp directory outside the workspace.
-- Prefer a host-provided workflow/task temp root when one exists. In Claude Code, use the current `/private/tmp/claude-<uid>/<workspace-key>/...` style root if the host exposes it. In other hosts, use `${TMPDIR:-/tmp}/ultracode/<workspace-key>/`.
+- For Codex runs, default to a persistent Codex-owned Ultracode log root:
+  `${CODEX_HOME:-$HOME/.codex}/log/ultracode/<workspace-key>/<run-id>/`.
+- Do not write into Codex internal session files, `history.jsonl`, `session_index.jsonl`, or SQLite databases. The Ultracode log root is skill-owned data beside Codex logs, not a mutation of Codex's private log format.
+- Prefer a host-provided workflow/task root when one exists and is explicitly more appropriate. In Claude Code, use the current `/private/tmp/claude-<uid>/<workspace-key>/...` style root if the host exposes it. In other hosts, use `${TMPDIR:-/tmp}/ultracode/<workspace-key>/`.
+- Fall back to `${TMPDIR:-/tmp}/ultracode/<workspace-key>/<run-id>/` only when the Codex log root is unavailable, the user requests temp-only artifacts, or host policy forbids writing under the Codex home directory.
 - Derive `<workspace-key>` from the absolute workspace path, sanitized to filesystem-safe hyphen-case, so concurrent workspaces do not collide.
 - Do not create `.workflow/ultracode/` in the workspace by default.
 - Use a workspace scratch root such as `.workflow/ultracode/`, `.context/ultracode/`, or another named directory only when the user or project instructions explicitly request persistent workspace artifacts.
 
-Default run root:
+Codex default run root:
 
 ```text
-${TMPDIR:-/tmp}/ultracode/<workspace-key>/
+${CODEX_HOME:-$HOME/.codex}/log/ultracode/<workspace-key>/<run-id>/
+```
+
+Codex fallback run root:
+
+```text
+${TMPDIR:-/tmp}/ultracode/<workspace-key>/<run-id>/
 ```
 
 Host temp example:
@@ -243,7 +252,16 @@ Run layout:
   results/
   integration.md
   final-report.md
+  metrics.json
 ```
+
+Also append a compact, privacy-safe line to:
+
+```text
+${CODEX_HOME:-$HOME/.codex}/log/ultracode/summary.jsonl
+```
+
+Skip `summary.jsonl` only when writing to the Codex log root is unavailable.
 
 Create optional heavy artifacts only when they reduce risk:
 
@@ -254,9 +272,9 @@ handoffs/           # only when separate handoff files reduce integration risk
 final-audit.md      # high-risk or full-contract runs
 ```
 
-Read `references/packet-schema.md` when filling packet files, result files, `orchestration.md`, or `state.json`.
+Read `references/packet-schema.md` when filling packet files, result files, `orchestration.md`, `state.json`, or `metrics.json`.
 
-To resume an interrupted Codex run, keep `slug` and `run_id` stable, read `state.json`, and continue from the first incomplete packet or verification check. Reuse the same temp run directory if it still exists. Temp directories may be cleaned between sessions; if the run directory is gone, start a new run unless the user provides saved artifacts. Claude Workflow journal/cache replay applies only when the current host is Claude Code and should be documented as Claude-only.
+To resume an interrupted Codex run, keep `slug` and `run_id` stable, read `state.json`, and continue from the first incomplete packet or verification check. Prefer the persistent Codex log root so runs survive temp cleanup. If the run directory is gone, start a new run unless the user provides saved artifacts. Claude Workflow journal/cache replay applies only when the current host is Claude Code and should be documented as Claude-only.
 
 ## Eval contracts
 

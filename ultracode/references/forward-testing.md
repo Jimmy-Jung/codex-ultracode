@@ -163,7 +163,9 @@ Expected:
 - Adversarial verification appears on non-trivial claims.
 - No Python helpers or invented runners are used; only host-native primitives.
 - Workflow mode creates useful artifacts, including `orchestration.md`.
-- Workflow artifacts default to a temp run root outside the workspace; `.workflow/ultracode/` appears only after an explicit workspace override.
+- Codex workflow artifacts default to `${CODEX_HOME:-$HOME/.codex}/log/ultracode/<workspace-key>/<run-id>/`; temp roots are fallback only.
+- Workflow artifacts include `metrics.json`, and Codex runs append a privacy-safe summary to `summary.jsonl` when the Codex log root is writable.
+- `.workflow/ultracode/` appears only after an explicit workspace override.
 - Workflow fallback records why native agents were not used.
 - Eval contracts and full contracts appear only when they reduce integration risk.
 - Approval gates stop irreversible or outward-facing work; they do not gate token spend or agent count.
