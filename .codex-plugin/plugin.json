@@ -1,0 +1,39 @@
+{
+  "name": "codex-ultracode",
+  "version": "0.1.0",
+  "description": "Codex-native Ultracode skill plugin for exhaustive multi-agent workflows.",
+  "author": {
+    "name": "JunyoungJung",
+    "email": "joony300@gmail.com",
+    "url": "https://github.com/Jimmy-Jung"
+  },
+  "homepage": "https://github.com/Jimmy-Jung/codex-ultracode",
+  "repository": "https://github.com/Jimmy-Jung/codex-ultracode",
+  "keywords": [
+    "codex",
+    "ultracode",
+    "multi-agent",
+    "workflow",
+    "skill"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Ultracode",
+    "shortDescription": "Exhaustive multi-agent workflow skill for Codex.",
+    "longDescription": "Codex Ultracode packages a Codex-native skill that plans complex work, decomposes it into packets, delegates to available subagents, verifies adversarially, and reports the result with durable artifacts.",
+    "developerName": "JunyoungJung",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write",
+      "Review"
+    ],
+    "websiteURL": "https://github.com/Jimmy-Jung/codex-ultracode",
+    "defaultPrompt": [
+      "$ultracode로 복잡한 디버깅을 조사 후 구현해줘.",
+      "$ultracode로 스펙 문서 기반 구현을 진행해줘.",
+      "$ultracode로 현재 변경사항을 독립 검증해줘."
+    ],
+    "brandColor": "#2563EB"
+  }
+}
