@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ultracode"
+  short_description: "Exhaustive multi-agent dynamic workflows"
+  default_prompt: "Use $ultracode to run an exhaustive Codex-native multi-agent workflow. Goal: <goal>. Scope: <files/modules/repo area>. Mode: <read-only audit|plan first|implement after discovery>. Constraints: ask before broad rewrites, commits, pushes, deletes, or external side effects. Required checks: <tests/build/review>. Use Codex surfaces such as /agent, /review, /diff, /permissions, /mcp, and /status when useful. If anything is unclear, ask one concise question or propose a safer rewritten prompt."
+
+policy:
+  allow_implicit_invocation: false
