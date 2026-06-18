@@ -1,6 +1,6 @@
 {
   "name": "codex-ultracode",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Codex-native Ultracode skill plugin for exhaustive multi-agent workflows.",
   "author": {
     "name": "JunyoungJung",
@@ -9,6 +9,7 @@
   },
   "homepage": "https://github.com/Jimmy-Jung/codex-ultracode",
   "repository": "https://github.com/Jimmy-Jung/codex-ultracode",
+  "license": "MIT",
   "keywords": [
     "codex",
     "ultracode",
