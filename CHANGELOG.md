@@ -5,7 +5,7 @@
 
 이 문서는 `codex-ultracode`의 사용자에게 보이는 변경 사항을 기록한다.
 
-## [Unreleased] - 2026-06-19
+## [0.2.0] - 2026-06-19
 
 ### Added
 
@@ -39,7 +39,3 @@
 - `git diff --check`
 - `packet-schema.md`와 `js-runner.md`의 Markdown JSON code block parse 확인
 - Fresh-session smoke로 불명확한 `this` 요청이 넓은 파일 수정으로 이어지지 않고, 대상 확인 질문과 read-only discovery 기본값으로 처리되는지 확인했다.
-
-### Notes
-
-- 플러그인 버전은 아직 변경하지 않았다. 현재 manifest version은 `0.1.1`이다.
