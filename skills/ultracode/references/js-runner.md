@@ -290,6 +290,42 @@ At minimum, `metrics.json` should record:
   "risk_level": "medium",
   "objective_kind": "implementation",
   "artifact_root": "absolute path to the run directory",
+  "plugin": {
+    "name": "codex-ultracode or null",
+    "version": "plugin manifest version or null",
+    "manifest_path": ".codex-plugin/plugin.json or null"
+  },
+  "host": {
+    "codex_version": "string or null",
+    "interface": "cli|ide|app|unknown",
+    "platform": "darwin|linux|windows|unknown",
+    "sandbox_mode": "read-only|workspace-write|danger-full-access|unknown",
+    "approval_policy": "never|on-request|on-failure|untrusted|unknown",
+    "native_subagent_available": null,
+    "review_surface_available": null,
+    "mcp_available": null
+  },
+  "invocation": {
+    "entrypoint": "explicit_skill|implicit_skill|manual|unknown",
+    "prompt_clarity": "clear|ambiguous|unknown",
+    "clarification_asked": false,
+    "target_inferred": false,
+    "raw_prompt_logged": false
+  },
+  "capabilities": {
+    "diff_checked": false,
+    "review_run": false,
+    "status_checked": false,
+    "mcp_checked": false,
+    "fresh_session_smoke_ran": false,
+    "skip_reasons": []
+  },
+  "safety": {
+    "write_permission_confirmed": false,
+    "approval_gates_triggered": [],
+    "external_action_requested": false,
+    "external_action_blocked": false
+  },
   "delegation": {
     "native_agent_used": true,
     "agent_count": 0,
@@ -326,9 +362,28 @@ At minimum, `metrics.json` should record:
   "timing": {
     "available": false,
     "elapsed_ms": null
+  },
+  "failure": {
+    "primary_phase": "none|planning|delegation|implementation|integration|verification|review|logging",
+    "category": "none|timeout|tool_unavailable|test_failure|permission|ambiguous_request|conflict|schema_error|unknown",
+    "retry_count": 0,
+    "blocked_reason": ""
+  },
+  "artifact_health": {
+    "artifact_write_ok": true,
+    "summary_append_ok": true,
+    "schema_validation_ok": null
+  },
+  "revision": {
+    "git_commit": "short sha or null",
+    "worktree_dirty": null,
+    "skill_manifest_version": "plugin version or null"
   }
 }
 ```
 
 Use `null` when Codex does not expose reliable token or timing data. Do not
-guess token usage from file size or message count.
+guess token usage from file size or message count. Read plugin version from the
+plugin manifest when available; otherwise set the plugin fields to `null`. Keep
+maintenance data as compact classifications and never store raw prompts, source
+code, secrets, or long tool output.

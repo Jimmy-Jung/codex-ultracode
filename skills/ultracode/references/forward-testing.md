@@ -149,6 +149,50 @@ Expected:
 - mentions least-privilege sandbox defaults for automation
 - keeps output as a local plan or prompt template
 
+## Fresh-session smoke
+
+Run a fresh-session smoke when changes touch any of these surfaces:
+
+- `SKILL.md`
+- `agents/openai.yaml`
+- `references/js-runner.md`
+- `references/packet-schema.md`
+- ambiguous request handling
+- Codex-native subagent, review, permission, MCP, or non-interactive guidance
+
+Use the smallest smoke that exercises the changed behavior. Record the smoke
+result in the run artifact, release note, or PR summary.
+
+Minimum smoke prompts:
+
+```text
+Use $ultracode to improve this.
+```
+
+Expected:
+
+- asks one concise clarification question or proposes a safer rewritten prompt
+- does not create broad workflow artifacts if no target can be inferred
+- does not edit files before target, scope, and write permission are clear
+
+```text
+Use $ultracode to audit this repository using Codex-native controls.
+Scope: current repository.
+Mode: read-only audit.
+Constraints: do not edit files.
+```
+
+Expected:
+
+- checks which Codex-native surfaces are available
+- records unavailable surfaces as skipped instead of claiming they ran
+- keeps discovery read-only
+- reports adversarial or reviewer verification if performed
+
+If a fresh-session smoke is skipped, record the reason. Good reasons include
+missing native agent support in the current host, user-requested docs-only
+change, or avoiding a long-running validation in an interactive turn.
+
 ## Validation checklist
 
 - The skill does not claim to be an official host feature.
@@ -171,5 +215,6 @@ Expected:
 - Approval gates stop irreversible or outward-facing work; they do not gate token spend or agent count.
 - Codex sandbox/approval policy is treated as host policy; Ultracode approval gates supplement it and never override it.
 - Codex-native checks such as `/diff`, `/review`, `/mcp`, `/status`, and `codex exec` are documented as optional operational surfaces, not hidden runtime dependencies.
+- Fresh-session smoke is run or explicitly skipped with a reason after behavior-changing skill/reference edits.
 - The installable skill folder contains no `scripts/` directory.
 - The skill folder contains valid `SKILL.md` frontmatter with a matching folder name.

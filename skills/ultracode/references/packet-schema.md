@@ -140,7 +140,24 @@ Required keys:
     "status_checked": false,
     "compact_considered": false,
     "noninteractive_used": false,
-    "notes": ""
+    "notes": "Set review_run true when a Codex /review surface, reviewer subagent, or equivalent independent review is completed; describe which one here."
+  },
+  "agents": [
+    {
+      "agent_id": "host agent id or null",
+      "agent_type": "explorer|worker|reviewer|docs_researcher|default|unknown",
+      "packet": "01-discovery",
+      "phase": "discovery|implementation|verification|review|other",
+      "status": "pending|in_progress|complete|blocked|skipped|timeout|attempted-timeout",
+      "isolation": "none|shared|worktree|unknown",
+      "worktree_path": "absolute path or null",
+      "result_path": "results/01-discovery.md",
+      "failure_reason": ""
+    }
+  ],
+  "agent_isolation_policy": {
+    "required_for_parallel_writes": false,
+    "notes": "Use worktree isolation for conflict-prone parallel write-capable agents; record each agent's isolation above."
   },
   "packets": [
     {
@@ -194,6 +211,42 @@ Required keys:
   "objective_kind": "debug|implementation|review|docs|research|migration|qa|other",
   "artifact_root": "absolute path to this run directory",
   "summary_record_path": "absolute path to summary.jsonl or null",
+  "plugin": {
+    "name": "codex-ultracode or null",
+    "version": "plugin manifest version or null",
+    "manifest_path": ".codex-plugin/plugin.json or null"
+  },
+  "host": {
+    "codex_version": "string or null",
+    "interface": "cli|ide|app|unknown",
+    "platform": "darwin|linux|windows|unknown",
+    "sandbox_mode": "read-only|workspace-write|danger-full-access|unknown",
+    "approval_policy": "never|on-request|on-failure|untrusted|unknown",
+    "native_subagent_available": null,
+    "review_surface_available": null,
+    "mcp_available": null
+  },
+  "invocation": {
+    "entrypoint": "explicit_skill|implicit_skill|manual|unknown",
+    "prompt_clarity": "clear|ambiguous|unknown",
+    "clarification_asked": false,
+    "target_inferred": false,
+    "raw_prompt_logged": false
+  },
+  "capabilities": {
+    "diff_checked": false,
+    "review_run": false,
+    "status_checked": false,
+    "mcp_checked": false,
+    "fresh_session_smoke_ran": false,
+    "skip_reasons": []
+  },
+  "safety": {
+    "write_permission_confirmed": false,
+    "approval_gates_triggered": [],
+    "external_action_requested": false,
+    "external_action_blocked": false
+  },
   "delegation": {
     "native_agent_used": false,
     "agent_count": 0,
@@ -243,12 +296,33 @@ Required keys:
     "residual_risk_count": null,
     "skipped_required_checks": 0
   },
+  "failure": {
+    "primary_phase": "none|planning|delegation|implementation|integration|verification|review|logging",
+    "category": "none|timeout|tool_unavailable|test_failure|permission|ambiguous_request|conflict|schema_error|unknown",
+    "retry_count": 0,
+    "blocked_reason": ""
+  },
+  "artifact_health": {
+    "artifact_write_ok": true,
+    "summary_append_ok": true,
+    "schema_validation_ok": null
+  },
+  "revision": {
+    "git_commit": "short sha or null",
+    "worktree_dirty": null,
+    "skill_manifest_version": "plugin version or null"
+  },
   "notes": ""
 }
 ```
 
 Use `null` instead of guessing. Token usage, wall-clock time, and reviewer
-finding counts are optional unless the host exposes reliable data.
+finding counts are optional unless the host exposes reliable data. For installed
+plugin runs, read `plugin.version` from `.codex-plugin/plugin.json` or the
+current installed plugin manifest. If no manifest is available, set plugin
+fields to `null` instead of inferring from a path. Keep maintenance telemetry as
+classification values, booleans, counts, or short skip reasons. Do not store raw
+prompts, source code, secrets, or long tool/agent output in metrics.
 
 ## summary.jsonl
 
@@ -269,6 +343,16 @@ Recommended fields:
   "mode": "direct|workflow|delegated",
   "risk_level": "low|medium|high|unknown",
   "objective_kind": "debug|implementation|review|docs|research|migration|qa|other",
+  "plugin_name": "codex-ultracode or null",
+  "plugin_version": "plugin manifest version or null",
+  "codex_version": "string or null",
+  "native_subagent_available": null,
+  "prompt_clarity": "clear|ambiguous|unknown",
+  "clarification_asked": false,
+  "primary_failure_category": "none|timeout|tool_unavailable|test_failure|permission|ambiguous_request|conflict|schema_error|unknown",
+  "fresh_session_smoke_ran": false,
+  "schema_validation_ok": null,
+  "worktree_dirty": null,
   "agent_count": 0,
   "packet_total": 0,
   "checks_total": 0,
@@ -349,6 +433,7 @@ You are not alone in the codebase. Do not revert edits made by others. Adapt to 
 ## Summary
 ## Evidence
 ## Handoff
+## Recommended parent action
 ## Files changed
 ## Decisions
 ## Risks
@@ -366,6 +451,7 @@ Handoff:
 - Assumptions:
 - Local checks:
 - Integration evidence:
+- Recommended parent action:
 - Risks:
 ```
 
@@ -377,11 +463,17 @@ Handoff:
 ## Accepted
 ## Rejected
 ## Conflicts
+## Contrary evidence
 ## Decisions
 ## Final changes
 ## Verification still needed
 ## Remaining risks
 ```
+
+Use `## Contrary evidence` when the parent session chose a final framing despite
+opposing local evidence, experiments, reviewer findings, or source-of-truth
+conflicts. Keep the entry short: evidence, decision, and why the rejected path
+did not win.
 
 ## final-report.md
 

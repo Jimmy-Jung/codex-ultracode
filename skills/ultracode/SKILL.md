@@ -263,6 +263,15 @@ ${CODEX_HOME:-$HOME/.codex}/log/ultracode/summary.jsonl
 
 Skip `summary.jsonl` only when writing to the Codex log root is unavailable.
 
+When writing `metrics.json` or `summary.jsonl`, record the plugin identity when
+the manifest is available. Prefer `.codex-plugin/plugin.json` in this
+repository, or the installed plugin manifest when running from a plugin cache.
+Set plugin name, version, and manifest path to `null` instead of guessing.
+Also record compact maintenance fields for host capabilities, invocation
+clarity, safety gates, failure category, artifact health, and revision state.
+Use classifications, booleans, counts, and short skip reasons; never log raw
+prompts, source code, secrets, or long tool/agent output.
+
 Create optional heavy artifacts only when they reduce risk:
 
 ```text
