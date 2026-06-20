@@ -5,6 +5,29 @@
 
 이 문서는 `codex-ultracode`의 사용자에게 보이는 변경 사항을 기록한다.
 
+## [0.2.1] - 2026-06-20
+
+### Added
+
+- `scripts/ultracode-doctor-logs.mjs`를 추가해 Ultracode log root의 `state.json`, `metrics.json`, `summary.jsonl` 정합성을 점검할 수 있게 했다.
+- `SKILL.md`에 run 완료 전 finalization checklist를 추가했다.
+- `packet-schema.md`에 `summary_append_ok`의 의미를 matching `summary.jsonl` record 재검증으로 명확히 했다.
+- `packet-schema.md`와 `js-runner.md`에 reviewer timeout attempt와 eventual review pass를 분리해 기록하는 필드를 추가했다.
+- `forward-testing.md`에 log finalizer regression 체크를 추가했다.
+
+### Changed
+
+- `metrics.status` 설명을 run status enum과 맞춰 `planning`, `waiting_for_approval`, `executing`, `integrating`, `verifying`, `complete`, `blocked`, `cancelled`를 허용하도록 정리했다.
+- README에 `ultracode-doctor-logs.mjs` 사용법과 private Codex log를 읽지 않는 경계를 추가했다.
+
+### Verified
+
+- `node --check scripts/ultracode-doctor-logs.mjs`
+- `node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.0 --json`
+- `node` 기반 skill 구조/frontmatter sanity check
+- `python3 -m json.tool .codex-plugin/plugin.json`
+- `git diff --check`
+
 ## [0.2.0] - 2026-06-19
 
 ### Added

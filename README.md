@@ -110,6 +110,8 @@ Codex에서 native subagent가 가능하면 `Delegated mode`가 가장 완전한
     plugin.json
   CHANGELOG.md
   README.md
+  scripts/
+    ultracode-doctor-logs.mjs
   skills/
     ultracode/
       SKILL.md
@@ -129,6 +131,7 @@ Codex에서 native subagent가 가능하면 `Delegated mode`가 가장 완전한
 | `.codex-plugin/plugin.json` | Codex 플러그인 manifest입니다. |
 | `CHANGELOG.md` | 사용자에게 보이는 변경 이력을 기록합니다. |
 | `README.md` | 처음 읽는 공개용 소개 문서입니다. |
+| `scripts/ultracode-doctor-logs.mjs` | Ultracode 로그와 finalization telemetry를 검사하는 repo/plugin bundle용 보조 도구입니다. |
 | `skills/ultracode/SKILL.md` | 실제 스킬 규칙입니다. Codex가 따르는 기준 문서입니다. |
 | `skills/ultracode/agents/openai.yaml` | Codex 표시 이름, 기본 프롬프트, 명시 호출 정책을 담습니다. |
 | `skills/ultracode/references/` | packet 형식, 승인 gate, 실행 예시, 검증 계약 등 상세 규칙을 담습니다. |
@@ -136,6 +139,40 @@ Codex에서 native subagent가 가능하면 `Delegated mode`가 가장 완전한
 `skills/ultracode/references/js-runner.md`는 예전 파일명을 유지하지만 실제
 JavaScript runner가 아닙니다. Codex에서 사용할 수 있는 native subagent와
 운영 표면을 Claude Workflow 개념에 대응시키는 adapter 문서입니다.
+
+## 로그 점검
+
+`0.2.1`부터 저장소에는 Ultracode run artifact를 점검하는 보조 명령이 포함됩니다.
+이 도구는 `${CODEX_HOME:-$HOME/.codex}/log/ultracode` 아래의 Ultracode-owned
+로그만 읽고, Codex의 private session log, `history.jsonl`, `session_index.jsonl`,
+SQLite database는 읽지 않습니다.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.1 --json
+```
+
+다른 프로젝트에서 설치된 플러그인의 cache를 직접 점검할 때는 플러그인 root를
+먼저 잡고 절대 경로로 실행합니다.
+
+```bash
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.1"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.1 --json
+```
+
+완료 직전 gate로 쓸 때는 한 run만 지정하고 error를 실패로 처리합니다.
+
+```bash
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --fail-on error
+```
+
+주요 검사 항목은 다음과 같습니다.
+
+- `state.json`과 `metrics.json`이 parse 가능한지
+- 필수 artifact가 있는지
+- `metrics.json` 필수 필드와 status enum이 맞는지
+- 완료된 run에 matching `summary.jsonl` record가 있는지
+- `summary_append_ok=true`가 실제 summary record 재검증 뒤에만 쓰였는지
+- timeout attempt와 최종 reviewer/parent review 성공이 분리되어 기록됐는지
 
 ## 설치 방법
 

@@ -218,3 +218,23 @@ change, or avoiding a long-running validation in an interactive turn.
 - Fresh-session smoke is run or explicitly skipped with a reason after behavior-changing skill/reference edits.
 - The installable skill folder contains no `scripts/` directory.
 - The skill folder contains valid `SKILL.md` frontmatter with a matching folder name.
+
+## Log finalizer regression
+
+Run this check after changes to `packet-schema.md`, telemetry guidance, or
+release finalization behavior:
+
+```bash
+node <plugin-root>/scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.1 --json
+```
+
+Expected:
+
+- `<plugin-root>` is the repository root or installed plugin cache root, not the current project workspace unless they are the same directory.
+- The command reads only `${CODEX_HOME:-$HOME/.codex}/log/ultracode`.
+- Completed runs without matching `summary.jsonl` records are reported.
+- `summary_append_ok=true` without a matching summary record is reported.
+- Nonstandard statuses such as `completed` are reported.
+- Missing required `metrics.json` fields are reported.
+- Reviewer timeout attempts are distinguishable from eventual review success.
+- Private Codex session files, `history.jsonl`, `session_index.jsonl`, and SQLite databases are not read.

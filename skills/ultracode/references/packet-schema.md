@@ -205,7 +205,7 @@ Required keys:
   "workspace_key": "filesystem-safe workspace key",
   "created_at": "ISO-8601 string",
   "completed_at": null,
-  "status": "planning|executing|complete|blocked|cancelled",
+  "status": "planning|waiting_for_approval|executing|integrating|verifying|complete|blocked|cancelled",
   "mode": "direct|workflow|delegated",
   "risk_level": "low|medium|high|unknown",
   "objective_kind": "debug|implementation|review|docs|research|migration|qa|other",
@@ -276,7 +276,9 @@ Required keys:
     "reviewer_agents": 0,
     "findings_total": null,
     "findings_accepted": null,
-    "findings_rejected": null
+    "findings_rejected": null,
+    "timeout_attempts": 0,
+    "eventual_pass_after_timeout": false
   },
   "token_usage": {
     "available": false,
@@ -324,6 +326,26 @@ fields to `null` instead of inferring from a path. Keep maintenance telemetry as
 classification values, booleans, counts, or short skip reasons. Do not store raw
 prompts, source code, secrets, or long tool/agent output in metrics.
 
+`artifact_health.summary_append_ok` means a matching `summary.jsonl` record was
+successfully re-read and verified by `run_id`; it does not mean only that an
+append was attempted. Set it to `false` or `null` until the matching compact
+summary record is present and parseable.
+
+Use `review.timeout_attempts` for reviewer or verification agents that timed out
+or disconnected. Use `review.eventual_pass_after_timeout` only when a later
+reviewer, `/review`, or parent manual review passed after such an attempt.
+
+Before setting a run to `complete`, run the repository helper when available:
+
+```bash
+node <plugin-root>/scripts/ultracode-doctor-logs.mjs --run-root <run-root> --fail-on error
+```
+
+Resolve `<plugin-root>` from the directory containing `.codex-plugin/plugin.json`
+or the installed plugin manifest. If the helper is unavailable because only the
+installable skill folder is present, perform the same checks manually and record
+the skip reason.
+
 ## summary.jsonl
 
 Append one single-line JSON object per run. It should be small enough to scan
@@ -339,7 +361,7 @@ Recommended fields:
   "slug": "string",
   "workspace_key": "string",
   "completed_at": "ISO-8601 string or null",
-  "status": "complete|blocked|cancelled|executing",
+  "status": "planning|waiting_for_approval|executing|integrating|verifying|complete|blocked|cancelled",
   "mode": "direct|workflow|delegated",
   "risk_level": "low|medium|high|unknown",
   "objective_kind": "debug|implementation|review|docs|research|migration|qa|other",

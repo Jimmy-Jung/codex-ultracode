@@ -351,6 +351,14 @@ At minimum, `metrics.json` should record:
     "tests_passed": null,
     "tests_failed": null
   },
+  "review": {
+    "reviewer_agents": 0,
+    "findings_total": null,
+    "findings_accepted": null,
+    "findings_rejected": null,
+    "timeout_attempts": 0,
+    "eventual_pass_after_timeout": false
+  },
   "token_usage": {
     "available": false,
     "source": null,
@@ -387,3 +395,17 @@ guess token usage from file size or message count. Read plugin version from the
 plugin manifest when available; otherwise set the plugin fields to `null`. Keep
 maintenance data as compact classifications and never store raw prompts, source
 code, secrets, or long tool output.
+
+Before finalizing a Codex run, validate the artifact set. When this repository's
+helper is available, run:
+
+```bash
+node <plugin-root>/scripts/ultracode-doctor-logs.mjs --run-root <run-root> --fail-on error
+```
+
+Resolve `<plugin-root>` from the directory containing `.codex-plugin/plugin.json`
+or the installed plugin manifest.
+
+Set `artifact_health.summary_append_ok=true` only after re-reading
+`summary.jsonl` and confirming a matching `run_id` record exists. Keep timeout
+attempts separate from eventual reviewer or parent-review success.

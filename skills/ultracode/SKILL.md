@@ -272,6 +272,28 @@ clarity, safety gates, failure category, artifact health, and revision state.
 Use classifications, booleans, counts, and short skip reasons; never log raw
 prompts, source code, secrets, or long tool/agent output.
 
+Before marking a run `complete`, run the finalization checklist:
+
+- parse `state.json` and `metrics.json`
+- verify required artifacts exist
+- validate status values against `references/packet-schema.md`
+- ensure `state.status` and `metrics.status` are compatible
+- verify required `metrics.json` fields are present
+- append `summary.jsonl` idempotently by `run_id`
+- re-read `summary.jsonl` and verify the matching `run_id` record exists before setting `artifact_health.summary_append_ok=true`
+- record timeout attempts separately from eventual reviewer or parent-review success
+
+When the plugin repository or bundle includes the helper, resolve `<plugin-root>`
+from the directory containing `.codex-plugin/plugin.json` or the installed plugin
+manifest, then prefer running this before finalizing a run:
+
+```bash
+node <plugin-root>/scripts/ultracode-doctor-logs.mjs --run-root <run-root> --fail-on error
+```
+
+If the helper is unavailable, perform the same checklist manually and record
+skipped validator checks in `final-report.md`.
+
 Create optional heavy artifacts only when they reduce risk:
 
 ```text
