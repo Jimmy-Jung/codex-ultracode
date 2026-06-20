@@ -5,6 +5,22 @@
 
 이 문서는 `codex-ultracode`의 사용자에게 보이는 변경 사항을 기록한다.
 
+## [0.2.3] - 2026-06-21
+
+### Added
+
+- `scripts/ultracode-doctor-logs.mjs`에 완료 상태 run만 검사하는 `--terminal-only` 옵션을 추가했다.
+- doctor JSON/human 출력에 `terminal_metrics_checked`, `nonterminal_metrics_skipped`, `warnings_by_code`, `errors_by_code` 요약을 추가했다.
+- doctor가 `metrics.plugin.version`을 기준으로 `0.2.1` 이후 추가된 필드를 과거 `0.2.0` 로그에 강제하지 않도록 version-aware required-field 검사를 추가했다.
+- fixture 기반 `node:test` 회귀 테스트를 추가해 summary plugin metadata 누락과 `summary_append_ok` 미확정 warning을 실제 로그 없이 검증한다.
+
+### Verified
+
+- `node --test tests/ultracode-doctor-logs.test.mjs`
+- `node --check scripts/ultracode-doctor-logs.mjs`
+- `node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.2 --workspace-key users-jimmy-documents-github-codex-ultracode --terminal-only --fail-on warning --json`
+- `node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.1 --terminal-only --fail-on warning --json` (expected warning exit)
+
 ## [0.2.2] - 2026-06-20
 
 ### Added

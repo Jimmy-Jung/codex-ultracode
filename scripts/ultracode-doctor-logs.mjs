@@ -139,6 +139,10 @@ const REQUIRED_METRICS_PATHS = [
   "revision.skill_manifest_version",
   "notes",
 ];
+const METRICS_FIELDS_ADDED_IN_0_2_1 = new Set([
+  "review.timeout_attempts",
+  "review.eventual_pass_after_timeout",
+]);
 
 function usage() {
   return `Usage: node scripts/ultracode-doctor-logs.mjs [options]
@@ -150,6 +154,7 @@ Options:
   --plugin-version <ver>   Filter metrics records by plugin.version.
   --workspace-key <key>    Filter metrics records by workspace_key.
   --run-id <id>            Filter metrics records by run_id.
+  --terminal-only          Only validate terminal runs: complete, blocked, or cancelled.
   --json                   Emit JSON instead of human-readable text.
   --fail-on <level>        none | warning | error. Defaults to none.
   --strict                 Alias for --fail-on error.
@@ -172,6 +177,7 @@ function parseArgs(argv) {
     pluginVersion: null,
     workspaceKey: null,
     runId: null,
+    terminalOnly: false,
     json: false,
     failOn: "none",
   };
@@ -204,6 +210,9 @@ function parseArgs(argv) {
         break;
       case "--run-id":
         options.runId = next();
+        break;
+      case "--terminal-only":
+        options.terminalOnly = true;
         break;
       case "--json":
         options.json = true;
@@ -383,6 +392,16 @@ function finalReportMentionsTimeout(artifactRoot) {
   );
 }
 
+function requiredMetricsPathsFor(metrics) {
+  const pluginVersion = getValue(metrics, "plugin.version");
+  if (pluginVersion && !isVersionAtLeast(pluginVersion, "0.2.1")) {
+    return REQUIRED_METRICS_PATHS.filter(
+      (requiredPath) => !METRICS_FIELDS_ADDED_IN_0_2_1.has(requiredPath),
+    );
+  }
+  return REQUIRED_METRICS_PATHS;
+}
+
 function analyzeMetrics(metricsPath, metrics, summary, options) {
   const issues = [];
   const context = {
@@ -437,7 +456,7 @@ function analyzeMetrics(metricsPath, metrics, summary, options) {
     );
   }
 
-  for (const requiredPath of REQUIRED_METRICS_PATHS) {
+  for (const requiredPath of requiredMetricsPathsFor(metrics)) {
     if (getValue(metrics, requiredPath) === undefined) {
       addIssue(
         issues,
@@ -686,12 +705,30 @@ function collectMetricsPaths(options) {
   return walkFiles(options.logRoot, new Set(["metrics.json"]));
 }
 
+function countIssuesByCode(issues, severity) {
+  const counts = {};
+  for (const issue of issues) {
+    if (severity && issue.severity !== severity) {
+      continue;
+    }
+    counts[issue.code] = (counts[issue.code] || 0) + 1;
+  }
+  return Object.fromEntries(
+    Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
 function renderHuman(result) {
   const lines = [
     "Ultracode log doctor",
     `log_root: ${result.log_root}`,
     `summary: ${result.summary_path}`,
+    `metrics_discovered: ${result.metrics_discovered}`,
     `metrics_checked: ${result.metrics_checked}`,
+    `terminal_metrics_checked: ${result.terminal_metrics_checked}`,
+    `nonterminal_metrics_checked: ${result.nonterminal_metrics_checked}`,
+    `nonterminal_metrics_skipped: ${result.nonterminal_metrics_skipped}`,
+    `filter_skipped: ${result.filter_skipped}`,
     `summary_records: ${result.summary_records}`,
     `errors: ${result.counts.error}`,
     `warnings: ${result.counts.warning}`,
@@ -699,6 +736,13 @@ function renderHuman(result) {
 
   if (result.filters.plugin_version || result.filters.workspace_key || result.filters.run_id) {
     lines.push(`filters: ${JSON.stringify(result.filters)}`);
+  }
+
+  if (Object.keys(result.errors_by_code).length > 0) {
+    lines.push(`errors_by_code: ${JSON.stringify(result.errors_by_code)}`);
+  }
+  if (Object.keys(result.warnings_by_code).length > 0) {
+    lines.push(`warnings_by_code: ${JSON.stringify(result.warnings_by_code)}`);
   }
 
   if (result.issues.length === 0) {
@@ -729,7 +773,12 @@ function run() {
   const summary = parseSummary(options.summaryPath);
   const metricsPaths = collectMetricsPaths(options);
   const issues = [...summary.issues];
+  let metricsDiscovered = 0;
   let metricsChecked = 0;
+  let terminalMetricsChecked = 0;
+  let nonterminalMetricsChecked = 0;
+  let nonterminalMetricsSkipped = 0;
+  let filterSkipped = 0;
 
   for (const metricsPath of metricsPaths) {
     const parsed = readJsonFile(metricsPath);
@@ -743,12 +792,28 @@ function run() {
       );
       continue;
     }
+    metricsDiscovered += 1;
     if (!shouldInclude(parsed.value, options)) {
+      filterSkipped += 1;
+      continue;
+    }
+
+    const terminal = isTerminal(parsed.value.status);
+    if (options.terminalOnly && !terminal) {
+      nonterminalMetricsSkipped += 1;
       continue;
     }
     metricsChecked += 1;
+    if (terminal) {
+      terminalMetricsChecked += 1;
+    } else {
+      nonterminalMetricsChecked += 1;
+    }
     issues.push(...analyzeMetrics(metricsPath, parsed.value, summary, options));
   }
+
+  const errorsByCode = countIssuesByCode(issues, "error");
+  const warningsByCode = countIssuesByCode(issues, "warning");
 
   const result = {
     schema_version: 1,
@@ -758,12 +823,24 @@ function run() {
       plugin_version: options.pluginVersion,
       workspace_key: options.workspaceKey,
       run_id: options.runId,
+      terminal_only: options.terminalOnly,
     },
+    metrics_discovered: metricsDiscovered,
     metrics_checked: metricsChecked,
+    terminal_metrics_checked: terminalMetricsChecked,
+    nonterminal_metrics_checked: nonterminalMetricsChecked,
+    nonterminal_metrics_skipped: nonterminalMetricsSkipped,
+    filter_skipped: filterSkipped,
     summary_records: summary.records.length,
     counts: {
       error: issues.filter((issue) => issue.severity === "error").length,
       warning: issues.filter((issue) => issue.severity === "warning").length,
+    },
+    errors_by_code: errorsByCode,
+    warnings_by_code: warningsByCode,
+    issues_by_code: {
+      error: errorsByCode,
+      warning: warningsByCode,
     },
     issues,
   };

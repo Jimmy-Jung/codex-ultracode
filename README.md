@@ -148,21 +148,28 @@ JavaScript runner가 아닙니다. Codex에서 사용할 수 있는 native subag
 SQLite database는 읽지 않습니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.2 --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.3 --json
 ```
 
 다른 프로젝트에서 설치된 플러그인의 cache를 직접 점검할 때는 플러그인 root를
 먼저 잡고 절대 경로로 실행합니다.
 
 ```bash
-PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.2"
-node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.2 --json
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.3"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.3 --json
 ```
 
-완료 직전 gate로 쓸 때는 한 run만 지정하고 error를 실패로 처리합니다.
+완료 직전 gate로 쓸 때는 한 run만 지정하고 warning까지 실패로 처리합니다.
 
 ```bash
-node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --fail-on error
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --fail-on warning
+```
+
+완료된 run만 모아서 release gate로 볼 때는 `--terminal-only`를 함께 사용합니다.
+진행 중인 artifact가 섞여 있어도 완료 run만 검사하므로 결과 해석이 명확합니다.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.3 --terminal-only --fail-on warning --json
 ```
 
 주요 검사 항목은 다음과 같습니다.
@@ -175,6 +182,14 @@ node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --f
 - `0.2.1` 이상 run의 summary plugin metadata가 `metrics.json`과 맞는지
 - 완료된 `0.2.1` 이상 run이 `summary_append_ok=true`로 닫혔는지
 - timeout attempt와 최종 reviewer/parent review 성공이 분리되어 기록됐는지
+
+JSON 출력에는 `terminal_metrics_checked`, `nonterminal_metrics_skipped`,
+`warnings_by_code`, `errors_by_code`가 포함되어 release gate에서 어떤 종류의 문제가
+얼마나 잡혔는지 바로 볼 수 있습니다.
+
+또한 doctor는 `metrics.plugin.version`을 기준으로 필수 필드 목록을 조정합니다.
+예를 들어 `0.2.1`에서 추가된 reviewer timeout 필드는 `0.2.0` 로그에는 강제하지
+않습니다.
 
 ## 설치 방법
 
