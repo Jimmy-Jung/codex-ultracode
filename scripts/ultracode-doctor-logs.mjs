@@ -40,6 +40,7 @@ const FAILURE_CATEGORIES = new Set([
   "schema_error",
   "unknown",
 ]);
+const FINALIZATION_WARNING_MIN_VERSION = "0.2.1";
 
 const REQUIRED_ARTIFACTS = [
   "plan.md",
@@ -343,6 +344,34 @@ function isTerminal(status) {
   return TERMINAL_STATUSES.has(status);
 }
 
+function parseVersion(version) {
+  if (typeof version !== "string") {
+    return null;
+  }
+  const match = version.match(/^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
+  if (!match) {
+    return null;
+  }
+  return match.slice(1, 4).map((part) => Number.parseInt(part, 10));
+}
+
+function isVersionAtLeast(version, minimum) {
+  const parsedVersion = parseVersion(version);
+  const parsedMinimum = parseVersion(minimum);
+  if (!parsedVersion || !parsedMinimum) {
+    return false;
+  }
+  for (let index = 0; index < parsedVersion.length; index += 1) {
+    if (parsedVersion[index] > parsedMinimum[index]) {
+      return true;
+    }
+    if (parsedVersion[index] < parsedMinimum[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function finalReportMentionsTimeout(artifactRoot) {
   const reportPath = path.join(artifactRoot, "final-report.md");
   if (!fs.existsSync(reportPath)) {
@@ -486,6 +515,12 @@ function analyzeMetrics(metricsPath, metrics, summary, options) {
 
   const summaryMatches = metrics.run_id ? summary.byRunId.get(metrics.run_id) || [] : [];
   const summaryRecord = summaryMatches[summaryMatches.length - 1]?.record || null;
+  const pluginName = getValue(metrics, "plugin.name");
+  const pluginVersion = getValue(metrics, "plugin.version");
+  const shouldWarnOnFinalizationGaps = isVersionAtLeast(
+    pluginVersion,
+    FINALIZATION_WARNING_MIN_VERSION,
+  );
 
   if (isTerminal(metrics.status) && summaryMatches.length === 0) {
     addIssue(
@@ -508,6 +543,47 @@ function analyzeMetrics(metricsPath, metrics, summary, options) {
   }
 
   if (summaryRecord) {
+    if (shouldWarnOnFinalizationGaps) {
+      const summaryPluginName = summaryRecord.plugin_name;
+      const summaryPluginVersion = summaryRecord.plugin_version;
+
+      if (pluginName && !summaryPluginName) {
+        addIssue(
+          issues,
+          "warning",
+          "summary_plugin_metadata_missing",
+          { ...context, field: "plugin_name" },
+          "summary record is missing plugin_name while metrics.plugin.name is available.",
+        );
+      } else if (pluginName && summaryPluginName !== pluginName) {
+        addIssue(
+          issues,
+          "warning",
+          "summary_plugin_metadata_mismatch",
+          { ...context, field: "plugin_name" },
+          `summary plugin_name (${JSON.stringify(summaryPluginName)}) does not match metrics.plugin.name (${JSON.stringify(pluginName)}).`,
+        );
+      }
+
+      if (pluginVersion && !summaryPluginVersion) {
+        addIssue(
+          issues,
+          "warning",
+          "summary_plugin_metadata_missing",
+          { ...context, field: "plugin_version" },
+          "summary record is missing plugin_version while metrics.plugin.version is available.",
+        );
+      } else if (pluginVersion && summaryPluginVersion !== pluginVersion) {
+        addIssue(
+          issues,
+          "warning",
+          "summary_plugin_metadata_mismatch",
+          { ...context, field: "plugin_version" },
+          `summary plugin_version (${JSON.stringify(summaryPluginVersion)}) does not match metrics.plugin.version (${JSON.stringify(pluginVersion)}).`,
+        );
+      }
+    }
+
     if (summaryRecord.status && !RUN_STATUSES.has(summaryRecord.status)) {
       addIssue(
         issues,
@@ -539,6 +615,20 @@ function analyzeMetrics(metricsPath, metrics, summary, options) {
         "summary artifact_root does not match metrics artifact_root.",
       );
     }
+  }
+
+  if (
+    shouldWarnOnFinalizationGaps &&
+    isTerminal(metrics.status) &&
+    getValue(metrics, "artifact_health.summary_append_ok") !== true
+  ) {
+    addIssue(
+      issues,
+      "warning",
+      "terminal_summary_append_unconfirmed",
+      context,
+      `terminal ${pluginVersion} run should leave artifact_health.summary_append_ok=true after re-reading the matching summary record.`,
+    );
   }
 
   const agentTimeouts = Number(getValue(metrics, "delegation.agent_timeouts") || 0);

@@ -331,6 +331,12 @@ successfully re-read and verified by `run_id`; it does not mean only that an
 append was attempted. Set it to `false` or `null` until the matching compact
 summary record is present and parseable.
 
+For terminal runs written by plugin version `0.2.1` or newer,
+`summary_append_ok` should be `true` after finalization. The matching summary
+record should carry plugin metadata such as `plugin_name` and `plugin_version`
+when the same values are available in `metrics.json`; the doctor reports
+missing or mismatched summary plugin metadata as warnings.
+
 Use `review.timeout_attempts` for reviewer or verification agents that timed out
 or disconnected. Use `review.eventual_pass_after_timeout` only when a later
 reviewer, `/review`, or parent manual review passed after such an attempt.

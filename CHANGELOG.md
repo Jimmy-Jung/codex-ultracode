@@ -5,6 +5,20 @@
 
 이 문서는 `codex-ultracode`의 사용자에게 보이는 변경 사항을 기록한다.
 
+## [0.2.2] - 2026-06-20
+
+### Added
+
+- `scripts/ultracode-doctor-logs.mjs`에 `0.2.1` 이상 run의 summary plugin metadata 누락/불일치와 terminal `summary_append_ok` 미확정을 warning으로 잡는 검사를 추가했다.
+
+### Verified
+
+- `node --check scripts/ultracode-doctor-logs.mjs`
+- `node scripts/ultracode-doctor-logs.mjs --run-root <0-2-1-log-finalizer-release> --fail-on warning --json`
+- `node scripts/ultracode-doctor-logs.mjs --run-root <aitutor-chat-math-rendering> --fail-on error --json`
+- `node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.1 --fail-on error --json`
+- `git diff --check`
+
 ## [0.2.1] - 2026-06-20
 
 ### Added

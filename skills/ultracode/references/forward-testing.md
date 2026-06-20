@@ -234,6 +234,8 @@ Expected:
 - The command reads only `${CODEX_HOME:-$HOME/.codex}/log/ultracode`.
 - Completed runs without matching `summary.jsonl` records are reported.
 - `summary_append_ok=true` without a matching summary record is reported.
+- `0.2.1` and newer runs with missing or mismatched summary plugin metadata are reported as warnings.
+- Terminal `0.2.1` and newer runs with `summary_append_ok` unset are reported as warnings.
 - Nonstandard statuses such as `completed` are reported.
 - Missing required `metrics.json` fields are reported.
 - Reviewer timeout attempts are distinguishable from eventual review success.
