@@ -1,5 +1,7 @@
 # Ultracode
 
+Language: [한국어](#ultracode) | [English](#english)
+
 Ultracode는 Codex에서 복잡한 개발 작업을 더 안전하게 처리하기 위한
 멀티 에이전트 워크플로우 스킬셋입니다.
 
@@ -148,15 +150,15 @@ JavaScript runner가 아닙니다. Codex에서 사용할 수 있는 native subag
 SQLite database는 읽지 않습니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.4 --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.5 --json
 ```
 
 다른 프로젝트에서 설치된 플러그인의 cache를 직접 점검할 때는 플러그인 root를
 먼저 잡고 절대 경로로 실행합니다.
 
 ```bash
-PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.4"
-node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.4 --json
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.5"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.5 --json
 ```
 
 완료 직전 gate로 쓸 때는 한 run만 지정하고 warning까지 실패로 처리합니다.
@@ -169,7 +171,7 @@ node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --f
 진행 중인 artifact가 섞여 있어도 완료 run만 검사하므로 결과 해석이 명확합니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.4 --terminal-only --fail-on warning --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.5 --terminal-only --fail-on warning --json
 ```
 
 과거 로그에는 `metrics.plugin.version`이 없는 legacy artifact가 있을 수 있습니다.
@@ -431,3 +433,375 @@ Workflow artifact는 판단 근거와 실행 기록입니다. repo 정책의 can
 ## 라이선스
 
 MIT License를 따릅니다. 자세한 내용은 `LICENSE`를 확인하세요.
+
+---
+
+# English
+
+Ultracode is a Codex skillset for handling complex development work with a
+safer multi-agent workflow.
+
+Instead of pushing one large task through in a single pass, the parent Codex
+session clarifies the goal, splits the work into smaller packets, delegates to
+subagents when available, verifies the results, and integrates the final answer.
+
+This repository adapts the workflow ideas behind Ultracode for Codex's
+skill/subagent environment. It is not an official port of Claude Code Workflow,
+and it does not reimplement the Claude Code Workflow runtime.
+
+```text
+request
+-> classify the task
+-> plan
+-> split into discovery / implementation / verification
+-> delegate to subagents when useful
+-> parent session integrates evidence and tests
+-> final report
+```
+
+## What This Skillset Is
+
+Ultracode is not a binary or a separate runtime.
+
+- It is a `SKILL.md`-based skillset that Codex can read.
+- It is an operating procedure for planning, decomposition, delegation, and verification.
+- It combines Codex-native agents, slash-command surfaces, MCP tools, review, and sandbox policy.
+- It is intended to be used only when explicitly invoked with `$ultracode` or similar wording.
+
+Ultracode also has clear boundaries.
+
+- It is not an official OpenAI, Claude, or Google feature.
+- It does not implement the Claude Code Workflow runtime.
+- It does not provide a JavaScript or Python workflow runner.
+- It does not bundle MCP servers, browser automation servers, or deployment tools.
+
+## Why Use It
+
+Small changes are better handled directly.
+
+For example, a typo fix, a one-file summary, or a single command does not need
+Ultracode.
+
+Ultracode is useful when missing something would be expensive:
+
+- implementing a feature that requires understanding the whole repository
+- debugging a flaky issue with several possible causes
+- implementing a long specification
+- changing authentication, payments, data migration, or other high-risk surfaces
+- changing code, tests, and documentation together
+- independently verifying a pull request before merge
+- checking a conclusion from an adversarial point of view
+
+The core value is confidence, not speed. One session does not simply decide on
+its own; it splits the work, gathers independent evidence, and then the parent
+session owns the final integration.
+
+## How It Works
+
+The parent Codex session remains responsible for the work. Subagents are used
+only for bounded, useful packets.
+
+```mermaid
+flowchart TD
+    User["User request"] --> Parent["Parent Codex session"]
+    Parent --> Classify{"Classify task"}
+
+    Classify -->|small and clear| Direct["Direct mode"]
+    Classify -->|needs phases| Workflow["Workflow mode"]
+    Classify -->|independent delegation helps| Delegated["Delegated mode"]
+
+    Direct --> NarrowCheck["Narrow verification"]
+
+    Workflow --> Plan["plan.md / orchestration.md"]
+    Plan --> Packets["Write packets"]
+    Packets --> ParentPass["Parent executes packet passes"]
+
+    Delegated --> DPlan["Plan and write packets"]
+    DPlan --> Agents["Subagent fan-out"]
+    Agents --> Results["Collect results"]
+
+    ParentPass --> Integration["Parent integration"]
+    Results --> Integration
+    NarrowCheck --> Report["Final report"]
+
+    Integration --> Verify["Tests / review / adversarial checks"]
+    Verify --> Report
+```
+
+Main concepts:
+
+- **Parent session:** classifies the task, plans, integrates results, and makes the final call.
+- **Packet:** a small unit of discovery, implementation, or verification work.
+- **Subagent:** an independent agent assigned to one packet. If subagents are unavailable, the parent session performs the same phases directly.
+- **Artifact:** files such as `plan.md`, `orchestration.md`, `state.json`, packet/result notes, `metrics.json`, and `summary.jsonl`.
+- **Adversarial verification:** a check that tries to prove the current conclusion wrong before the final answer is trusted.
+
+When Codex-native subagents are available, substantial tasks use Delegated mode.
+When they are unavailable, Ultracode falls back to a single-session workflow.
+Tiny tasks should use Direct mode.
+
+## Repository Layout
+
+```text
+./
+  .codex-plugin/
+    plugin.json
+  CHANGELOG.md
+  README.md
+  scripts/
+    ultracode-doctor-logs.mjs
+  skills/
+    ultracode/
+      SKILL.md
+      agents/
+        openai.yaml
+      references/
+        approval-gates.md
+        eval-contracts.md
+        execution-examples.md
+        forward-testing.md
+        js-runner.md
+        packet-schema.md
+```
+
+| Path | Purpose |
+| --- | --- |
+| `.codex-plugin/plugin.json` | Codex plugin manifest. |
+| `CHANGELOG.md` | User-facing release notes. |
+| `README.md` | Introductory public documentation. |
+| `scripts/ultracode-doctor-logs.mjs` | Helper for checking Ultracode log artifacts and finalization telemetry. |
+| `skills/ultracode/SKILL.md` | The canonical skill instructions followed by Codex. |
+| `skills/ultracode/agents/openai.yaml` | Display metadata, default prompts, and explicit-invocation policy. |
+| `skills/ultracode/references/` | Detailed references for packets, approval gates, execution examples, and eval contracts. |
+
+`skills/ultracode/references/js-runner.md` keeps its historical filename, but it
+is not a JavaScript runner. It is an adapter document that maps Claude Workflow
+ideas to Codex-native subagent and tool surfaces.
+
+## Log Doctor
+
+Since `0.2.1`, this repository includes a helper that checks Ultracode run
+artifacts. It reads only the Ultracode-owned log tree under
+`${CODEX_HOME:-$HOME/.codex}/log/ultracode`; it does not read Codex private
+session logs, `history.jsonl`, `session_index.jsonl`, or SQLite databases.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.5 --json
+```
+
+To check an installed plugin cache directly:
+
+```bash
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.5"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.5 --json
+```
+
+For a final gate before completing one run, prefer `--run-root` and fail on
+warnings:
+
+```bash
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --fail-on warning
+```
+
+To check only terminal runs, use `--terminal-only`.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.5 --terminal-only --fail-on warning --json
+```
+
+Older artifacts may not have `metrics.plugin.version`. The default behavior is
+strict, but historical audits can explicitly downgrade that case to a warning.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs \
+  --workspace-key users-jimmy-documents-github-codex-ultracode \
+  --terminal-only \
+  --legacy-missing-version warning \
+  --fail-on error \
+  --json
+```
+
+If old workspace keys differ only by case, underscores, or spaces, use opt-in
+normalized matching.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs \
+  --workspace-key users-jimmy-documents-github-codex-ultracode \
+  --workspace-key-normalized \
+  --terminal-only \
+  --json
+```
+
+The doctor checks:
+
+- whether `state.json` and `metrics.json` parse
+- whether required artifacts exist
+- whether `metrics.json` required fields and status enums are valid
+- whether terminal runs have matching `summary.jsonl` records
+- whether `summary_append_ok=true` reflects an actual summary re-read
+- whether `0.2.1+` summary plugin metadata matches `metrics.json`
+- whether terminal `0.2.1+` runs finalize with `summary_append_ok=true`
+- whether timeout attempts are separated from eventual review success
+
+JSON output includes `terminal_metrics_checked`, `nonterminal_metrics_skipped`,
+`warnings_by_code`, and `errors_by_code` so release gates can explain failures
+by issue type.
+
+## Installation
+
+This repository follows the Codex plugin layout. Installing it as a plugin makes
+`skills/ultracode` available as a Codex skill.
+
+For one project, copy the skill folder into `.agents/skills/`.
+
+```bash
+mkdir -p your-project/.agents/skills
+cp -R skills/ultracode your-project/.agents/skills/ultracode
+```
+
+For user-level use across projects:
+
+```bash
+mkdir -p ~/.agents/skills
+cp -R skills/ultracode ~/.agents/skills/ultracode
+```
+
+Then open a fresh Codex session and invoke the skill explicitly.
+
+```text
+$ultracode debug this intermittent login failure.
+```
+
+`skills/ultracode/agents/openai.yaml` uses `allow_implicit_invocation: false`.
+That means Ultracode should not automatically take over ordinary work; it is
+designed for explicit invocation.
+
+## Good Use Cases
+
+| Situation | What Ultracode Does | Expected Result |
+| --- | --- | --- |
+| Complex debugging | Splits causes, reproduction paths, and verification. | Cause, change scope, and regression checks are documented. |
+| Spec-driven implementation | Turns the spec into packets and verification checks. | Fewer missed requirements and clearer traceability. |
+| Risky module changes | Separates discovery, implementation, and review. | Clear rationale and verification evidence. |
+| Pre-PR review | Reviews changed files independently. | Blocking issues and residual risks are found earlier. |
+| Legacy code changes | Traces current behavior before editing. | Assumptions and blast radius are explicit. |
+
+## Usage
+
+The best prompt includes goal, scope, mode, constraints, and required checks.
+
+```text
+Use $ultracode to <goal>.
+Scope: <files, modules, or repository area>.
+Mode: <read-only audit | plan first | implement after discovery | verify only>.
+Constraints: <no edits, no commits, ask before broad rewrites, etc.>.
+Required checks: <tests, build, lint, docs parity, review>.
+Output: <desired result format>.
+```
+
+If the request is vague, Ultracode should not make broad edits. It should ask
+one short clarification question or propose a safer rewritten prompt.
+
+```text
+Use $ultracode to improve <target>.
+Scope: <file or module>.
+Mode: read-only discovery first, then propose a plan before editing.
+Constraints: ask before broad rewrites, deletion, commits, or pushes.
+Required checks: <tests, build, review>.
+Output: plan, evidence, and verification steps.
+```
+
+### Pre-PR Review
+
+```text
+Use $ultracode to review the payment module changes before a pull request.
+Scope: changed files, payment tests, and payment API boundaries.
+Mode: verify only.
+Constraints: do not edit files or commit.
+Required checks: missing edge cases, security risks, regressions, and test evidence.
+Output: blocking issues first, then recommendations and remaining risks.
+```
+
+### Complex Debugging
+
+```text
+Use $ultracode to debug an intermittent login failure.
+Scope: auth module, session handling, and login tests.
+Mode: investigate, then implement.
+Constraints: summarize hypotheses before editing; ask before broad changes.
+Required checks: reproduction path, log or test evidence, regression tests.
+Output: cause, change scope, changed files, verification, remaining risks.
+```
+
+### Spec-Driven Implementation
+
+```text
+Use $ultracode to implement payment v2 from specs/payment-v2-spec.md.
+Scope: payment domain, API, tests, and related docs.
+Mode: investigate, then implement.
+Constraints: report behavior that conflicts with the spec; do not commit or push.
+Required checks: spec checklist, unit tests, integration tests, security review.
+Output: checklist, changed files, verification, unresolved items.
+```
+
+## Modes
+
+| Mode | When to Use | Behavior |
+| --- | --- | --- |
+| Direct mode | Small, clear tasks | Parent session handles the task and runs a narrow check. |
+| Workflow mode | Multiple phases, but no subagents | Parent session runs planning, execution, and verification in one session. |
+| Delegated mode | Complex work where subagents help | Parent session delegates packets and integrates the results. |
+
+## Codex Surfaces Used
+
+Ultracode is not a separate runtime. It uses Codex surfaces when available and
+records skip reasons when they are unavailable.
+
+- `/permissions`: separates read-only discovery from bounded implementation.
+- `/diff`: reviews changes before final integration.
+- `/review` or reviewer subagent: performs independent adversarial verification.
+- `/status`: checks permissions, change state, and run state.
+- `/mcp`: checks availability of external tools such as docs, browser, or GitHub tools.
+- `codex exec`: only for user-requested CI dry runs or non-interactive reports.
+
+## Safety Principles
+
+- Do not run automatically without explicit invocation.
+- Do not commit, push, deploy, publish, or mutate external resources unless the user asks.
+- Ask before deletion, broad rewrites, credential changes, or production data access.
+- Do not trust subagent results blindly; the parent session verifies evidence and tests.
+- Report skipped verification honestly.
+
+## When Not To Use It
+
+Ultracode is too heavy for:
+
+- one typo
+- a tiny wording change in one file
+- a one-line fix with a known cause
+- a simple command
+- a quick conversational question
+
+Use the normal Codex flow for those.
+
+## Recommended Reading Order
+
+1. `README.md`
+2. `CHANGELOG.md`
+3. `.codex-plugin/plugin.json`
+4. `skills/ultracode/SKILL.md`
+5. `skills/ultracode/references/execution-examples.md`
+6. `skills/ultracode/references/js-runner.md`
+7. `skills/ultracode/references/packet-schema.md`
+8. `skills/ultracode/references/approval-gates.md`
+9. `skills/ultracode/references/eval-contracts.md`
+10. `skills/ultracode/references/forward-testing.md`
+
+`README.md` is introductory. The canonical operating rules live in
+`skills/ultracode/SKILL.md` and the explicitly maintained reference documents.
+
+Workflow artifacts are evidence and execution records, not the canonical policy.
+
+## License
+
+MIT License. See `LICENSE` for details.
