@@ -143,6 +143,20 @@ const METRICS_FIELDS_ADDED_IN_0_2_1 = new Set([
   "review.timeout_attempts",
   "review.eventual_pass_after_timeout",
 ]);
+const LEGACY_MISSING_VERSION_REQUIRED_METRICS_PATHS = REQUIRED_METRICS_PATHS.filter(
+  (requiredPath) =>
+    ![
+      "plugin.",
+      "host.",
+      "invocation.",
+      "capabilities.",
+      "safety.",
+      "failure.",
+      "artifact_health.",
+      "revision.",
+    ].some((prefix) => requiredPath.startsWith(prefix)) &&
+    !METRICS_FIELDS_ADDED_IN_0_2_1.has(requiredPath),
+);
 
 function usage() {
   return `Usage: node scripts/ultracode-doctor-logs.mjs [options]
@@ -153,8 +167,12 @@ Options:
   --summary <path>         summary.jsonl path. Defaults to <log-root>/summary.jsonl.
   --plugin-version <ver>   Filter metrics records by plugin.version.
   --workspace-key <key>    Filter metrics records by workspace_key.
+  --workspace-key-normalized
+                           Match workspace_key case-insensitively after simple normalization.
   --run-id <id>            Filter metrics records by run_id.
   --terminal-only          Only validate terminal runs: complete, blocked, or cancelled.
+  --legacy-missing-version <level>
+                           error | warning. Defaults to error.
   --json                   Emit JSON instead of human-readable text.
   --fail-on <level>        none | warning | error. Defaults to none.
   --strict                 Alias for --fail-on error.
@@ -176,8 +194,10 @@ function parseArgs(argv) {
     summaryPath: null,
     pluginVersion: null,
     workspaceKey: null,
+    workspaceKeyNormalized: false,
     runId: null,
     terminalOnly: false,
+    legacyMissingVersion: "error",
     json: false,
     failOn: "none",
   };
@@ -208,11 +228,17 @@ function parseArgs(argv) {
       case "--workspace-key":
         options.workspaceKey = next();
         break;
+      case "--workspace-key-normalized":
+        options.workspaceKeyNormalized = true;
+        break;
       case "--run-id":
         options.runId = next();
         break;
       case "--terminal-only":
         options.terminalOnly = true;
+        break;
+      case "--legacy-missing-version":
+        options.legacyMissingVersion = next();
         break;
       case "--json":
         options.json = true;
@@ -235,6 +261,9 @@ function parseArgs(argv) {
 
   if (!new Set(["none", "warning", "error"]).has(options.failOn)) {
     throw new Error("--fail-on must be one of: none, warning, error");
+  }
+  if (!new Set(["error", "warning"]).has(options.legacyMissingVersion)) {
+    throw new Error("--legacy-missing-version must be one of: error, warning");
   }
 
   options.summaryPath =
@@ -392,8 +421,11 @@ function finalReportMentionsTimeout(artifactRoot) {
   );
 }
 
-function requiredMetricsPathsFor(metrics) {
+function requiredMetricsPathsFor(metrics, options) {
   const pluginVersion = getValue(metrics, "plugin.version");
+  if (!pluginVersion && options.legacyMissingVersion === "warning") {
+    return LEGACY_MISSING_VERSION_REQUIRED_METRICS_PATHS;
+  }
   if (pluginVersion && !isVersionAtLeast(pluginVersion, "0.2.1")) {
     return REQUIRED_METRICS_PATHS.filter(
       (requiredPath) => !METRICS_FIELDS_ADDED_IN_0_2_1.has(requiredPath),
@@ -456,7 +488,20 @@ function analyzeMetrics(metricsPath, metrics, summary, options) {
     );
   }
 
-  for (const requiredPath of requiredMetricsPathsFor(metrics)) {
+  if (
+    !getValue(metrics, "plugin.version") &&
+    options.legacyMissingVersion === "warning"
+  ) {
+    addIssue(
+      issues,
+      "warning",
+      "legacy_metrics_missing_plugin_version",
+      context,
+      "metrics.json has no plugin.version; applying legacy missing-version checks because --legacy-missing-version=warning was set.",
+    );
+  }
+
+  for (const requiredPath of requiredMetricsPathsFor(metrics, options)) {
     if (getValue(metrics, requiredPath) === undefined) {
       addIssue(
         issues,
@@ -689,13 +734,31 @@ function shouldInclude(metrics, options) {
   if (options.pluginVersion && getValue(metrics, "plugin.version") !== options.pluginVersion) {
     return false;
   }
-  if (options.workspaceKey && metrics.workspace_key !== options.workspaceKey) {
+  if (
+    options.workspaceKey &&
+    !workspaceMatches(metrics.workspace_key, options.workspaceKey, options)
+  ) {
     return false;
   }
   if (options.runId && metrics.run_id !== options.runId) {
     return false;
   }
   return true;
+}
+
+function normalizeWorkspaceKey(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function workspaceMatches(actual, expected, options) {
+  if (!options.workspaceKeyNormalized) {
+    return actual === expected;
+  }
+  return normalizeWorkspaceKey(actual) === normalizeWorkspaceKey(expected);
 }
 
 function collectMetricsPaths(options) {
@@ -822,8 +885,10 @@ function run() {
     filters: {
       plugin_version: options.pluginVersion,
       workspace_key: options.workspaceKey,
+      workspace_key_normalized: options.workspaceKeyNormalized,
       run_id: options.runId,
       terminal_only: options.terminalOnly,
+      legacy_missing_version: options.legacyMissingVersion,
     },
     metrics_discovered: metricsDiscovered,
     metrics_checked: metricsChecked,

@@ -334,3 +334,121 @@ test("uses version-aware metrics fields for 0.2.0 logs", (t) => {
   assert.equal(result.json.counts.warning, 0);
   assert.equal(result.json.metrics_checked, 1);
 });
+
+test("can downgrade missing plugin.version legacy metrics when explicitly requested", (t) => {
+  const logRoot = makeTempLogRoot(t);
+  const { root, metrics } = writeRun(logRoot, "legacy-without-plugin-version", {
+    version: "0.2.0",
+  });
+  const legacyMetrics = {
+    ...metrics,
+    review: {
+      reviewer_agents: metrics.review.reviewer_agents,
+      findings_total: metrics.review.findings_total,
+      findings_accepted: metrics.review.findings_accepted,
+      findings_rejected: metrics.review.findings_rejected,
+    },
+  };
+  for (const key of [
+    "plugin",
+    "host",
+    "invocation",
+    "capabilities",
+    "safety",
+    "failure",
+    "artifact_health",
+    "revision",
+  ]) {
+    delete legacyMetrics[key];
+  }
+  writeJson(path.join(root, "metrics.json"), legacyMetrics);
+  appendSummary(logRoot, {
+    schema_version: 1,
+    run_id: metrics.run_id,
+    slug: metrics.slug,
+    workspace_key: metrics.workspace_key,
+    completed_at: metrics.completed_at,
+    status: "complete",
+    mode: metrics.mode,
+    risk_level: metrics.risk_level,
+    objective_kind: metrics.objective_kind,
+    artifact_root: root,
+  });
+
+  const strictResult = runDoctor([
+    "--log-root",
+    logRoot,
+    "--run-id",
+    metrics.run_id,
+    "--fail-on",
+    "error",
+    "--json",
+  ]);
+
+  assert.equal(strictResult.status, 1);
+  assert.equal(strictResult.json.errors_by_code.missing_metrics_field > 0, true);
+
+  const relaxedResult = runDoctor([
+    "--log-root",
+    logRoot,
+    "--run-id",
+    metrics.run_id,
+    "--legacy-missing-version",
+    "warning",
+    "--fail-on",
+    "error",
+    "--json",
+  ]);
+
+  assert.equal(relaxedResult.status, 0, relaxedResult.stderr);
+  assert.equal(relaxedResult.json.counts.error, 0);
+  assert.equal(relaxedResult.json.warnings_by_code.legacy_metrics_missing_plugin_version, 1);
+});
+
+test("can match workspace keys with normalization when explicitly requested", (t) => {
+  const logRoot = makeTempLogRoot(t);
+  const { root, metrics } = writeRun(logRoot, "case-workspace", {
+    metrics: {
+      workspace_key: "Users-Jimmy-Documents-GitHub-Codex-Ultracode",
+    },
+  });
+  appendSummary(logRoot, {
+    schema_version: 1,
+    run_id: metrics.run_id,
+    slug: metrics.slug,
+    workspace_key: metrics.workspace_key,
+    completed_at: metrics.completed_at,
+    status: "complete",
+    mode: metrics.mode,
+    risk_level: metrics.risk_level,
+    objective_kind: metrics.objective_kind,
+    plugin_name: "codex-ultracode",
+    plugin_version: "0.2.2",
+    artifact_root: root,
+  });
+
+  const exactResult = runDoctor([
+    "--log-root",
+    logRoot,
+    "--workspace-key",
+    "users-jimmy-documents-github-codex-ultracode",
+    "--json",
+  ]);
+
+  assert.equal(exactResult.status, 0, exactResult.stderr);
+  assert.equal(exactResult.json.metrics_checked, 0);
+  assert.equal(exactResult.json.filter_skipped, 1);
+
+  const normalizedResult = runDoctor([
+    "--log-root",
+    logRoot,
+    "--workspace-key",
+    "users-jimmy-documents-github-codex-ultracode",
+    "--workspace-key-normalized",
+    "--json",
+  ]);
+
+  assert.equal(normalizedResult.status, 0, normalizedResult.stderr);
+  assert.equal(normalizedResult.json.metrics_checked, 1);
+  assert.equal(normalizedResult.json.filter_skipped, 0);
+});

@@ -172,6 +172,30 @@ node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --f
 node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.4 --terminal-only --fail-on warning --json
 ```
 
+과거 로그에는 `metrics.plugin.version`이 없는 legacy artifact가 있을 수 있습니다.
+기본값은 strict error지만, historical audit에서 의도적으로 warning으로 낮추려면
+명시 옵션을 사용합니다.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs \
+  --workspace-key users-jimmy-documents-github-codex-ultracode \
+  --terminal-only \
+  --legacy-missing-version warning \
+  --fail-on error \
+  --json
+```
+
+workspace key의 대소문자나 `_`/공백 차이 때문에 같은 workspace 로그가 나뉜
+경우에는 opt-in 정규화 매칭을 사용할 수 있습니다.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs \
+  --workspace-key users-jimmy-documents-github-codex-ultracode \
+  --workspace-key-normalized \
+  --terminal-only \
+  --json
+```
+
 주요 검사 항목은 다음과 같습니다.
 
 - `state.json`과 `metrics.json`이 parse 가능한지

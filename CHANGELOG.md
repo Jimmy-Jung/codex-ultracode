@@ -5,6 +5,19 @@
 
 이 문서는 `codex-ultracode`의 사용자에게 보이는 변경 사항을 기록한다.
 
+## [Unreleased]
+
+### Added
+
+- `ultracode-doctor-logs.mjs`에 `--legacy-missing-version warning` 옵션을 추가해, plugin version이 없는 legacy metrics를 명시적으로 warning 취급할 수 있게 했다.
+- `ultracode-doctor-logs.mjs`에 `--workspace-key-normalized` 옵션을 추가해, workspace key 대소문자/구분자 차이를 opt-in으로 정규화해 비교할 수 있게 했다.
+- legacy no-plugin metrics와 normalized workspace matching 회귀 테스트를 추가했다.
+
+### Verified
+
+- `node --check scripts/ultracode-doctor-logs.mjs`
+- `node --test tests/ultracode-doctor-logs.test.mjs` (5 pass)
+
 ## [0.2.4] - 2026-06-22
 
 ### Changed
