@@ -838,10 +838,6 @@ function run() {
     },
     errors_by_code: errorsByCode,
     warnings_by_code: warningsByCode,
-    issues_by_code: {
-      error: errorsByCode,
-      warning: warningsByCode,
-    },
     issues,
   };
 

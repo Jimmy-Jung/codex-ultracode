@@ -148,15 +148,15 @@ JavaScript runner가 아닙니다. Codex에서 사용할 수 있는 native subag
 SQLite database는 읽지 않습니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.3 --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.4 --json
 ```
 
 다른 프로젝트에서 설치된 플러그인의 cache를 직접 점검할 때는 플러그인 root를
 먼저 잡고 절대 경로로 실행합니다.
 
 ```bash
-PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.3"
-node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.3 --json
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.4"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.4 --json
 ```
 
 완료 직전 gate로 쓸 때는 한 run만 지정하고 warning까지 실패로 처리합니다.
@@ -169,7 +169,7 @@ node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --f
 진행 중인 artifact가 섞여 있어도 완료 run만 검사하므로 결과 해석이 명확합니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.3 --terminal-only --fail-on warning --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.4 --terminal-only --fail-on warning --json
 ```
 
 주요 검사 항목은 다음과 같습니다.

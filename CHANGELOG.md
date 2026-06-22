@@ -5,6 +5,21 @@
 
 이 문서는 `codex-ultracode`의 사용자에게 보이는 변경 사항을 기록한다.
 
+## [0.2.4] - 2026-06-22
+
+### Changed
+
+- doctor JSON 출력에서 `errors_by_code`/`warnings_by_code`와 중복되던 `issues_by_code` 필드를 제거했다.
+
+### Fixed
+
+- `.gitignore`를 추가해 mitmproxy MCP 산출물(`*.db`)과 `.DS_Store`가 저장소에 섞이지 않도록 했다.
+
+### Verified
+
+- `node --check scripts/ultracode-doctor-logs.mjs`
+- `node --test tests/ultracode-doctor-logs.test.mjs` (3 pass)
+
 ## [0.2.3] - 2026-06-21
 
 ### Added

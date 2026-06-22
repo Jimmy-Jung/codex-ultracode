@@ -1,0 +1,5 @@
+# MCP / tooling artifacts
+*.db
+
+# OS
+.DS_Store
