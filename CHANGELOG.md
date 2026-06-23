@@ -5,6 +5,27 @@
 
 이 문서는 `codex-ultracode`의 사용자에게 보이는 변경 사항을 기록한다.
 
+## [1.0.0] - 2026-06-23
+
+### Added
+
+- `.agents/plugins/marketplace.json`를 추가해 GitHub 저장소를 Codex marketplace source로 등록할 수 있게 했다.
+- README에 일반 사용자용 Codex 플러그인 설치 명령을 추가했다.
+
+### Changed
+
+- 플러그인 manifest 버전을 `1.0.0`으로 올렸다.
+- README의 현재 플러그인 cache/doctor 예시를 `1.0.0` 기준으로 갱신했다.
+
+### Verified
+
+- `node --check scripts/ultracode-doctor-logs.mjs`
+- `node --test tests/ultracode-doctor-logs.test.mjs`
+- `python3 -m json.tool .codex-plugin/plugin.json`
+- `python3 -m json.tool .agents/plugins/marketplace.json`
+- `codex plugin marketplace add <repo> && codex plugin add codex-ultracode@codex-ultracode --json` with a temporary `HOME`
+- `git diff --check`
+
 ## [0.2.5] - 2026-06-22
 
 ### Added

@@ -108,6 +108,9 @@ Codex에서 native subagent가 가능하면 `Delegated mode`가 가장 완전한
 
 ```text
 ./
+  .agents/
+    plugins/
+      marketplace.json
   .codex-plugin/
     plugin.json
   CHANGELOG.md
@@ -130,6 +133,7 @@ Codex에서 native subagent가 가능하면 `Delegated mode`가 가장 완전한
 
 | 경로 | 역할 |
 | --- | --- |
+| `.agents/plugins/marketplace.json` | 이 저장소를 Codex marketplace로 등록하기 위한 manifest입니다. |
 | `.codex-plugin/plugin.json` | Codex 플러그인 manifest입니다. |
 | `CHANGELOG.md` | 사용자에게 보이는 변경 이력을 기록합니다. |
 | `README.md` | 처음 읽는 공개용 소개 문서입니다. |
@@ -150,15 +154,15 @@ JavaScript runner가 아닙니다. Codex에서 사용할 수 있는 native subag
 SQLite database는 읽지 않습니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.5 --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.0 --json
 ```
 
 다른 프로젝트에서 설치된 플러그인의 cache를 직접 점검할 때는 플러그인 root를
 먼저 잡고 절대 경로로 실행합니다.
 
 ```bash
-PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.5"
-node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.5 --json
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-ultracode/codex-ultracode/1.0.0"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 1.0.0 --json
 ```
 
 완료 직전 gate로 쓸 때는 한 run만 지정하고 warning까지 실패로 처리합니다.
@@ -171,7 +175,7 @@ node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --f
 진행 중인 artifact가 섞여 있어도 완료 run만 검사하므로 결과 해석이 명확합니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.5 --terminal-only --fail-on warning --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.0 --terminal-only --fail-on warning --json
 ```
 
 과거 로그에는 `metrics.plugin.version`이 없는 legacy artifact가 있을 수 있습니다.
@@ -222,8 +226,19 @@ JSON 출력에는 `terminal_metrics_checked`, `nonterminal_metrics_skipped`,
 이 저장소는 Codex 플러그인 구조를 따릅니다. 플러그인으로 설치하면
 `skills/ultracode`가 Codex skill로 로드됩니다.
 
-로컬에서 직접 개발하거나 설치하지 않고 시험하려면 이 저장소를 Codex가 읽는
-플러그인 위치에 두고 `.codex-plugin/plugin.json`을 기준으로 로드합니다.
+일반 사용자는 GitHub 저장소를 Codex marketplace로 등록한 뒤 플러그인을
+설치합니다.
+
+```bash
+codex plugin marketplace add Jimmy-Jung/codex-ultracode --ref main
+codex plugin add codex-ultracode@codex-ultracode --json
+```
+
+설치 상태는 다음 명령으로 확인합니다.
+
+```bash
+codex plugin list --json
+```
 
 플러그인 설치 대신 프로젝트 하나에서만 쓰려면 대상 프로젝트의 `.agents/skills/`
 아래로 스킬 폴더만 복사합니다.
@@ -544,6 +559,9 @@ Tiny tasks should use Direct mode.
 
 ```text
 ./
+  .agents/
+    plugins/
+      marketplace.json
   .codex-plugin/
     plugin.json
   CHANGELOG.md
@@ -566,6 +584,7 @@ Tiny tasks should use Direct mode.
 
 | Path | Purpose |
 | --- | --- |
+| `.agents/plugins/marketplace.json` | Marketplace manifest for registering this repository with Codex. |
 | `.codex-plugin/plugin.json` | Codex plugin manifest. |
 | `CHANGELOG.md` | User-facing release notes. |
 | `README.md` | Introductory public documentation. |
@@ -586,14 +605,14 @@ artifacts. It reads only the Ultracode-owned log tree under
 session logs, `history.jsonl`, `session_index.jsonl`, or SQLite databases.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.5 --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.0 --json
 ```
 
 To check an installed plugin cache directly:
 
 ```bash
-PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/codex-ultracode/0.2.5"
-node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 0.2.5 --json
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-ultracode/codex-ultracode/1.0.0"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 1.0.0 --json
 ```
 
 For a final gate before completing one run, prefer `--run-root` and fail on
@@ -606,7 +625,7 @@ node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --run-root "$RUN_ROOT" --f
 To check only terminal runs, use `--terminal-only`.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 0.2.5 --terminal-only --fail-on warning --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.0 --terminal-only --fail-on warning --json
 ```
 
 Older artifacts may not have `metrics.plugin.version`. The default behavior is
@@ -651,6 +670,20 @@ by issue type.
 
 This repository follows the Codex plugin layout. Installing it as a plugin makes
 `skills/ultracode` available as a Codex skill.
+
+For normal installation, register the GitHub repository as a Codex marketplace,
+then install the plugin.
+
+```bash
+codex plugin marketplace add Jimmy-Jung/codex-ultracode --ref main
+codex plugin add codex-ultracode@codex-ultracode --json
+```
+
+Check the installed plugin list with:
+
+```bash
+codex plugin list --json
+```
 
 For one project, copy the skill folder into `.agents/skills/`.
 
