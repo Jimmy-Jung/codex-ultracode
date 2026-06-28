@@ -1,0 +1,1 @@
+{"id":"brackets","language":"Python","backend":"smoke","prompt":"br.py has a failing program. Run `python3 test_visible.py` and make it pass by fixing is_balanced per its docstring. Do not edit the test.","test_cmd":"python3 test_objective.py"}

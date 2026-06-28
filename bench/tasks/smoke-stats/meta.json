@@ -1,0 +1,7 @@
+{
+  "id": "smoke-stats",
+  "language": "Python",
+  "backend": "smoke",
+  "prompt": "stats.py has a failing self-check in test_stats.py. Run `python3 test_stats.py`, find the root cause of each failure, and fix stats.py until it prints ALL PASS and exits 0. Do not edit the test.",
+  "test_cmd": "python3 test_stats.py"
+}

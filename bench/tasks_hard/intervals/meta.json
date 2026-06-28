@@ -1,0 +1,1 @@
+{"id":"intervals","language":"Python","backend":"smoke","prompt":"iv.py has a failing program. Run `python3 test_visible.py` and make it pass by fixing merge_intervals per its docstring. Do not edit the test.","test_cmd":"python3 test_objective.py"}

@@ -1,0 +1,206 @@
+# Ultracode 플러그인 - 효과 측정 및 개선 (사이클 1)
+
+**날짜:** 2026-06-27 · **하네스:** `bench/bench.py` (paired A/B, codex `solo` vs `ultracode`)
+
+## 측정한 것
+
+스킬은 컨텍스트 주입이다. `ultracode` 군은 스킬의 운영 규칙
+(`SKILL.md`, frontmatter 제거)을 `codex exec` 프롬프트에 주입하고, `solo`는
+순수 작업만 실행한다. 두 군 모두 격리된 일회용 git 클론에서 실행된다. 실행마다
+두 가지 축을 본다.
+
+- **목표 지표(objective)**: 패치 이후 **숨겨진** 테스트(에이전트에게 절대 보여주지 않음)가 통과하는가?
+  보이는 테스트만 만족하는 임시방편 수정을 잡아낸다.
+- **평가표(rubric)**: codex-as-judge가 diff를 1-5점으로 평가한다(정확성, 범위, 부수 효과, 근본 원인).
+- **비용 대리 지표(cost proxy)**: wall-clock 경과 시간(동일 머신/모델; 토큰 캡처는 n/a, 주의사항 참고).
+
+### 판별용 작업 모음 (`bench/tasks_disc/`)
+| task | bug | visible은 통과하지만 hidden은 실패하는 임시방편 |
+|---|---|---|
+| roman | `to_roman` 테이블에 감산 표기 형식이 빠짐 | visible의 두 케이스만 하드코딩 |
+| config | `parse_config`가 주석/엣지 케이스에서 crash | 한 번만 split하되 trim/empty/값 안의 `=` 처리를 생략 |
+| paginate | 1-indexed page의 off-by-one | (대조군: 올바른 수정이 명확함) |
+
+검증 결과: baseline에서는 visible 테스트가 실패하고(수정할 일이 있음), 시뮬레이션한
+임시방편은 visible은 통과하지만 hidden 테스트는 실패한다(판별기가 작동함).
+
+## 기준 결과 (현재 SKILL.md, 560줄)
+
+| 군 | 해결 수(hidden) | 평가표 | ~경과 시간 |
+|---|---|---|---|
+| solo | **3/3 (1.000)** | 5.0 | **33s** |
+| ultracode v1 | **3/3 (1.000)** | 5.0 | **233s** |
+
+v1의 작업별 경과 시간: config 209s, paginate 246s, roman 245s.
+
+**발견:** 이 작업 모음에서 560줄 스킬은 순수 codex 대비 정확성이나 품질 이득을
+**전혀** 제공하지 않았고, wall-clock 비용은 **약 7배**였다. codex는 스킬 없이도
+이 작업들을 올바르게 고칠 만큼 강했고 임시방편을 쓰지 않았다. 따라서 정확성 축은
+포화되었고, 유일한 차별점은 비용인데 v1이 훨씬 나쁘다.
+
+이는 연구 결과(`bench/research-synthesis.md` 참고)와 일치한다. 단순하고 의존성이
+결합된 코딩에서는 최대 fan-out / "토큰 비용은 제약이 아니다"라는 접근이 정확성
+없이 비용만 늘린다(Anthropic multi-agent 연구: 토큰 사용량이 비용 분산의 약 80%를
+설명하며, 결합된 코딩에서는 multi-agent가 single-agent보다 성능이 낮음). 또한
+560줄 스킬은 instruction adherence가 저하되는 Anthropic의 약 500줄 상한을 넘는다.
+
+## 적용한 개선 (SKILL v2, 74줄)
+
+근거 기반 재작성(`skills/ultracode/SKILL.v2.md`), 주요 변경 사항:
+1. 태도: **"검증은 철저하게, fan-out은 가치 기준으로"**: 비용을 무시하지 않음.
+2. 코딩의 기본 모드 = **실행 결과에 기반한 단일 루프**; 실제로 독립적인 breadth-first 작업에만 위임.
+3. **강한 검증 게이트**: 주장은 실행한 명령 출력이 필요함; **수정 전 재현**;
+   visible 증상이 아니라 **계약/근본 원인**을 수정.
+4. **범위 울타리**: 대상만 변경; 추측성 hardening 금지; 존재하지 않는 dependency 환각 금지.
+5. 비평자는 correctness에만 한정; adversarial round는 최대 2회.
+6. 560줄 → **74줄** (progressive disclosure; 세부 사항은 `references/`로 이동).
+
+## 개선 후 결과
+
+| 군 | 해결 수(hidden) | 평가표 | ~경과 시간 |
+|---|---|---|---|
+| solo | 3/3 (1.000) | 5.0 | 33s |
+| ultracode v1 (560 ln) | 3/3 (1.000) | 5.0 | 233s |
+| **ultracode v2 (74 ln)** | **3/3 (1.000)** | **5.0** | **39s** |
+
+v2의 작업별 경과 시간: config 33s, paginate 40s, roman 45s.
+
+**개선: 동일한 정확성과 품질을 약 6배 낮은 비용으로 달성(233s → 39s, -83%),
+모든 작업에서 일관됨(각각 5-7배 더 빠름).** v2는 거의 solo 속도(39s vs 33s)로
+실행되면서, 더 어려운 작업에서 중요해질 검증 규율은 유지한다. v2는 `SKILL.md`로
+승격되었다.
+
+## 주의사항 (솔직한 한계)
+
+- **N=3, 1회 반복** → 통계적으로 충분한 검정력이 없다. 하지만 v1→v2 비용 차이는
+  크고 작업별로도 일관적이므로 방향성은 견고하다. 크기는 대략적인 값이다.
+- **Correctness saturated**: codex가 모든 작업을 도움 없이 해결했기 때문에, v2의
+  검증 규칙은 여기서 *정확성* 이득을 보여줄 수 없었다. 이득은 동일 정확성에서의
+  효율성이다. 검증 규율이 정확성까지 끌어올리는지는 **더 어려운 작업**
+  (Modal을 통한 SWE-bench Pro - `bench/README.md` 참고)이 필요하다.
+- **Cost proxy = elapsed**; 토큰 캡처는 n/a를 반환했다(codex `--json` 필드 불일치,
+  `_parse_tokens`). elapsed는 고정 머신/모델에서의 작업량을 추적한다.
+- 이는 **하나의 codex 세션 안에서의 skill-content 주입**을 측정한 것이며, 실제
+  subagent fan-out은 측정하지 않았다(`codex exec`는 single-session으로 실행됨).
+  위임 태도 수정(#7/#9)은 이 하네스가 아니라 연구로 검증된다.
+
+## 다음 사이클
+- 더 어려운 샘플에서 SWE-bench Pro objective 축(Modal)을 실행해, v2의 검증 게이트가
+  비용뿐 아니라 *정확성*도 끌어올리는지 테스트한다.
+- `_parse_tokens`를 수정해 실제 토큰 delta를 보고하게 한다(elapsed보다 강한 비용 근거).
+
+---
+
+# 사이클 2 - v2의 검증 규율이 *정확성*을 높이는가? (더 어려운 작업)
+
+**목표:** 정확성 격차를 찾는 것. 더 어려운 작업 4개(`bench/tasks_hard/`)를 만들었고,
+그중 두 개는 강한 **임시방편 유도 작업**이다(partial-table `to_roman`,
+`number_to_words` 0-999). 빠른 수정이 좁은 visible 테스트는 special-case로 만족시키되
+일반 hidden 테스트는 실패할 수 있는 형태다. 검증 결과: 각 작업의 visible 테스트는
+baseline에서 실패하고(수정할 일이 있음), 시뮬레이션한 임시방편은 visible은 통과하지만
+hidden objective 테스트는 실패한다.
+
+| 군 | 해결 수(hidden) | 평가표 | ~경과 시간 |
+|---|---|---|---|
+| solo | **4/4 (1.000)** | 5.0 | 37s |
+| ultracode v2 | **4/4 (1.000)** | 5.0 | 48s |
+
+작업별: roman2, num2words, intervals, brackets. **solo가 4개 모두 해결**했고,
+임시방편 유도 작업도 포함된다. resolved-rate delta = +0.000, 95% CI [0,0].
+
+**발견(솔직하게):** codex-solo는 유도 작업에서도 **임시방편을 쓰지 않았다**. 도움 없이
+일반화하고 근본 원인을 수정했다. single-file, single-session local task에서는 정확성
+축이 **포화**되어 있으므로, v2의 검증 규율은 여기서 *정확성* 이득을 보여줄 수 없다
+(해는 없고, solo 대비 약 30% 시간 overhead가 있으며, 그래도 v1보다는 약 5배 낫다).
+
+## 두 사이클의 결론
+- **입증됨:** v2는 원래 SKILL 대비 실제 개선이다. **동일 정확성/품질에서 약 6배 낮은
+  비용**(사이클 1). 원래의 560줄 "max fan-out, cost-blind" 스킬은 단순 코딩에서
+  순수 codex보다 엄격히 나빴다.
+- **로컬에서는 입증 불가:** 검증 규율로 인한 *정확성* 이득. codex-solo는 single-file
+  작업에서 너무 강하다. 정확성 향상을 입증하려면 single-pass 역량을 넘어서는 작업이
+  필요하다. 실제 **SWE-bench Pro**(multi-file, hours-long; Modal auth + cost 필요)
+  및/또는 실제 **subagent fan-out**(플러그인이 의도한 host runtime; `codex exec`는
+  single-session이라 이 하네스는 이를 실행할 수 없음).
+- **종합:** 근거 기반 재작성은 올바른 선택이다. 측정된 큰 효율성 penalty를 품질 비용
+  없이 제거했다. 정확성 가치 제안은 더 어렵고 fan-out이 가능한 경기장에서 검증해야 할
+  가설로 남아 있다.
+
+---
+
+# 사이클 3 - 실제 SWE-bench Pro (Modal 채점, n=3)
+
+**설정:** 공개 Pro instance 3개(NodeBB ×2, qutebrowser ×1; ansible은 크기 때문에 제외).
+codex가 실제 repo에서 양쪽 군의 패치를 생성했다(base_commit의 host clone). 패치는
+**공식 Scale 하네스 `swe_bench_pro_eval.py`를 Modal cloud에서 실행**해 채점했다
+(`jefzda/sweap-images` x86 컨테이너를 pull하고, 각 repo의 실제 FAIL_TO_PASS/PASS_TO_PASS 실행).
+필요했던 integration fix: CSV는 `repo`(owner/name)와 소문자 `fail_to_pass`/`pass_to_pass`
+컬럼을 요구했다(하네스 docstring과 code가 불일치). patch JSON `{instance_id,patch,prefix}`는 일치했다.
+
+| 인스턴스 | solo | ultracode v2 |
+|---|---|---|
+| NodeBB-0499… | resolved | resolved |
+| qutebrowser-c580… | resolved | resolved |
+| NodeBB-51d8… | failed | failed |
+| **resolved** | **2/3 (66.7%)** | **2/3 (66.7%)** |
+
+생성 비용(elapsed): solo는 instance당 약 260s, v2는 instance당 약 335s. Rubric: solo 2.33, v2 2.67.
+
+**발견:** 실제 SWE-bench Pro에서 v2와 순수 codex는 **같은** 2/3을 해결했다. 동일한
+instance가 통과하고 동일한 하나가 실패했다. n=3에서 **정확성 차이는 없음**(그리고 n=3은
+어떤 통계적 주장에도 너무 작다. CI가 거의 전체 범위를 덮는다). 두 군 모두 같은
+instance에서 실패했다(둘 다 rubric 1의 나쁜 patch). 이는 해당 instance가 스킬과 무관하게
+single-pass `codex exec`의 범위를 넘어섰음을 시사한다.
+
+## 전체 판정 (3개 사이클)
+- **입증 및 적용 완료:** v2 SKILL은 실제 개선이다. 원래 560줄 스킬 대비 **동일 품질에서
+  약 6배 낮은 비용**(사이클 1)을 보였고, 표준 평가셋인 SWE-bench Pro에서도 **정확성
+  회귀 없음**이 확인되었다(사이클 3: v2는 순수 codex와 동일하게 2/3).
+- **입증되지 않음:** 스킬로 인한 정확성 *우위*. 로컬 easy(사이클 1), 로컬 hard
+  임시방편 유도 작업(사이클 2), 실제 Pro(사이클 3) 전체에서 v2는 정확성에서 solo를
+  이긴 적이 없고 동률이다. 검증 규율의 효과는 효율성 + 무회귀로 나타났지, 아직 더 높은
+  resolve rate로 나타나지는 않았다.
+- **왜 여기서는 정확성 우위에 도달하기 어려울 수 있는가:** `codex exec`는 single-session으로
+  실행되므로, 스킬의 진짜 레버(독립 subagent fan-out + adversarial verification)가 전혀
+  사용되지 않는다. 주입되는 것은 운영 *규칙*인데, 강한 단일 모델은 이미 그 대부분을 따른다.
+  fan-out 레버를 테스트하려면 실제로 subagent를 생성하는 host(플러그인이 의도한 Claude Code /
+  Codex `spawn_agent` runtime)와, 통계적 검정력을 위한 더 큰 Pro 표본이 필요하다.
+
+---
+
+# 사이클 3b - SWE-bench Pro를 n=12로 확장 (Modal 채점)
+
+8개 repo(NodeBB, navidrome, ansible×2, protonmail/webclients×2, openlibrary×3,
+flipt, qutebrowser, tutanota)에 걸친 Pro instance 12개의 strided sample을 사용했다.
+두 군 모두 실제 repo에서 codex가 생성했고, Modal에서 공식 Scale 하네스로 채점했다.
+
+| 지표 | solo | ultracode v2 |
+|---|---|---|
+| **해결 수(resolved)** | **3/12 (25.0%)** | **3/12 (25.0%)** |
+| 해결된 instance | NodeBB-04998908, qutebrowser-c580…(34a13), openlibrary-92db3454 | **동일** |
+| 평가표(rubric, n=10 patched) | 3.00 | 2.90 |
+| 생성 경과 시간/instance | ~286s | ~333s |
+
+해결률 차이(resolved-rate delta) = **+0.000, 95% CI [0, 0]**. 평균만 같은 것이 아니라,
+**양쪽 군에서 정확히 같은 instance가 통과하고 실패했다**. ansible instance 2개는
+420초 cap 안에서 양쪽 군 모두 빈 patch를 생성했으므로 대칭적으로 제외했다.
+
+**발견:** 표준 평가셋인 SWE-bench Pro n=12에서 v2와 순수 codex는 **정확성 측면에서
+구분되지 않는다**. instance별 결과가 완전히 일치했다. single-session `codex exec`에서는
+검증 규율이 resolve rate를 높이지도 낮추지도 않았다.
+
+## 최종 판정 (사이클 1-3b)
+
+| 주장 | 상태 | 근거 |
+|---|---|---|
+| v2는 동일 품질에서 원래 560줄 스킬보다 비용이 낮다 | **입증됨** | 사이클 1: 약 6배 빠름(39s vs 233s), 3/3 vs 3/3 |
+| v2는 정확성을 회귀시키지 않는다 | **표준 평가셋에서 입증됨** | 사이클 3b: SWE-bench Pro n=12, 3/12 == 3/12, 동일 instance |
+| v2는 순수 codex보다 정확성을 높인다 | **근거 없음** | 모든 곳에서 동률(local easy, local hard, Pro n=3, Pro n=12) |
+
+**결론:** 근거 기반 재작성(560→74줄, "검증 기반, 가치 기준 fan-out")은 올바른 변경이다.
+측정된 약 6배 효율성 penalty를 제거했고, 실제 SWE-bench Pro에서 **정확성 비용이 없다는
+점도 확인했다**. 다만 이 하네스에서는 스킬로 인한 정확성 *향상*을 뒷받침하지 못한다.
+`codex exec`가 single-session으로 실행되기 때문에 스킬의 실제 레버인 독립 subagent fan-out과
+adversarial verification이 전혀 실행되지 않는다. 운영 *규칙*만 주입하는 것으로는 강한 단일
+모델의 결과를 바꾸지 못했다. 그 레버를 테스트하려면 실제로 subagent를 생성하는 host와,
+통계적 검정력을 갖춘 더 큰 Pro 표본이 필요하다.

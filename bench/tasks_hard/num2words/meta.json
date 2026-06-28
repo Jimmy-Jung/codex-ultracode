@@ -1,0 +1,1 @@
+{"id":"num2words","language":"Python","backend":"smoke","prompt":"n2w.py has a failing program. Run `python3 test_visible.py` and make it pass by fixing number_to_words per its docstring. Do not edit the test.","test_cmd":"python3 test_objective.py"}

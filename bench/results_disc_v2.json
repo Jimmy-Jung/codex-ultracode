@@ -1,0 +1,76 @@
+{
+  "runs": [
+    {
+      "arm": "ultracode",
+      "seed": 0,
+      "task": "config",
+      "timed_out": false,
+      "elapsed_s": 32.7,
+      "tokens": null,
+      "patch_bytes": 523,
+      "patch": "diff --git a/cfg.py b/cfg.py\nindex 5586242..e4e724c 100644\n--- a/cfg.py\n+++ b/cfg.py\n@@ -3,6 +3,9 @@ def parse_config(text: str) -> dict:\n     Ignore blank lines and lines starting with '#'. Keep '=' in values. Trim spaces.\"\"\"\n     out={}\n     for line in text.splitlines():\n-        key,value=line.split(\"=\")\n-        out[key]=value\n+        line=line.strip()\n+        if not line or line.startswith(\"#\"):\n+            continue\n+        key,value=line.split(\"=\", 1)\n+        out[key.strip()]=value.strip()\n     return out\n",
+      "objective": {
+        "backend": "smoke",
+        "resolved": true,
+        "returncode": 0,
+        "tail": "objective OK\n"
+      },
+      "rubric": {
+        "correctness_confidence": 5,
+        "scope_discipline": 5,
+        "no_collateral_damage": 5,
+        "root_cause": 5,
+        "overall": 5,
+        "rationale": "The diff directly implements the documented behavior: skips blank and comment lines, trims surrounding whitespace, splits only on the first '=', and preserves additional '=' characters in the value. The change is tightly scoped to parse_config, does not touch tests or unrelated code, and fixes the underlying parsing defects rather than hardcoding for visible tests."
+      }
+    },
+    {
+      "arm": "ultracode",
+      "seed": 0,
+      "task": "paginate",
+      "timed_out": false,
+      "elapsed_s": 39.9,
+      "tokens": null,
+      "patch_bytes": 355,
+      "patch": "diff --git a/paginate.py b/paginate.py\nindex ce19dfa..cd9935b 100644\n--- a/paginate.py\n+++ b/paginate.py\n@@ -1,4 +1,4 @@\n def page_items(items, page, per_page):\n     \"\"\"Return the slice of `items` for 1-indexed `page` with `per_page` items each.\"\"\"\n-    start = page * per_page\n+    start = (page - 1) * per_page\n     return items[start:start + per_page]\n",
+      "objective": {
+        "backend": "smoke",
+        "resolved": true,
+        "returncode": 0,
+        "tail": "objective OK\n"
+      },
+      "rubric": {
+        "correctness_confidence": 5,
+        "scope_discipline": 5,
+        "no_collateral_damage": 5,
+        "root_cause": 5,
+        "overall": 5,
+        "rationale": "The diff directly fixes the off-by-one error for a 1-indexed page by computing start as (page - 1) * per_page. It is minimal, touches only the requested function, does not edit tests or churn unrelated code, and addresses the actual cause rather than masking behavior. Edge cases such as invalid page values are not specified by the task, so they do not reduce the score."
+      }
+    },
+    {
+      "arm": "ultracode",
+      "seed": 0,
+      "task": "roman",
+      "timed_out": false,
+      "elapsed_s": 44.8,
+      "tokens": null,
+      "patch_bytes": 894,
+      "patch": "diff --git a/roman.py b/roman.py\nindex e63c7fb..1dfe330 100644\n--- a/roman.py\n+++ b/roman.py\n@@ -1,4 +1,28 @@\n def to_roman(n: int) -> str:\n     \"\"\"Convert a positive integer (1..3999) to a Roman numeral string.\"\"\"\n-    table = {1: \"I\", 5: \"V\", 10: \"X\", 50: \"L\", 100: \"C\", 500: \"D\", 1000: \"M\"}\n-    return table[n]\n+    if not 1 <= n <= 3999:\n+        raise ValueError(\"n must be in the range 1..3999\")\n+\n+    values = (\n+        (1000, \"M\"),\n+        (900, \"CM\"),\n+        (500, \"D\"),\n+        (400, \"CD\"),\n+        (100, \"C\"),\n+        (90, \"XC\"),\n+        (50, \"L\"),\n+        (40, \"XL\"),\n+        (10, \"X\"),\n+        (9, \"IX\"),\n+        (5, \"V\"),\n+        (4, \"IV\"),\n+        (1, \"I\"),\n+    )\n+\n+    result = []\n+    remaining = n\n+    for value, numeral in values:\n+        count, remaining = divmod(remaining, value)\n+        result.extend([numeral] * count)\n+\n+    return \"\".join(result)\n",
+      "objective": {
+        "backend": "smoke",
+        "resolved": true,
+        "returncode": 0,
+        "tail": "objective OK\n"
+      },
+      "rubric": {
+        "correctness_confidence": 5,
+        "scope_discipline": 5,
+        "no_collateral_damage": 5,
+        "root_cause": 5,
+        "overall": 5,
+        "rationale": "The implementation replaces the incomplete exact-key lookup with a standard greedy Roman numeral conversion including subtractive forms, covering the documented 1..3999 range. It is tightly scoped to to_roman in roman.py, does not edit tests or unrelated code, and fixes the actual missing conversion logic rather than special-casing visible tests. The added range validation is consistent with the docstring and unlikely to cause collateral damage."
+      }
+    }
+  ]
+}

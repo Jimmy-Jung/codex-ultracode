@@ -3,3 +3,12 @@
 
 # OS
 .DS_Store
+.gstack/
+
+# bench harness — regenerable / large
+bench/.venv/
+bench/__pycache__/
+bench/*.log
+bench/tasks_pro/
+bench/tasks_pro3/
+bench/tasks_pro12/
