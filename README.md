@@ -69,17 +69,13 @@ Ultracode는 다음처럼 놓치는 비용이 큰 작업에 맞습니다.
 
 어려운 문제를 풀 때 ultracode는 두 가지 방법을 씁니다.
 
-- **한 명이 더 오래 고민하게 하기** — Codex에서 `xhigh`라고 부르는 "깊게 생각하기" 모드.
-- **여러 명에게 나눠 맡기고 합치기** — 작업을 여러 AI(서브에이전트)에게 쪼개 각자 맡은 부분을 깊게
-  보게 한 뒤 결과를 합칩니다. 이걸 dynamic workflow(멀티에이전트)라고 부릅니다.
+- **한 명이 더 오래 고민하게 하기** — Codex의 `xhigh` 추론 모드(설정 키 `model_reasoning_effort`). Codex 기본값은 medium이고, 지연에 둔감한 어려운 작업에 xhigh를 권장합니다.
+- **여러 명에게 나눠 맡기고 합치기** — 작업을 여러 AI(서브에이전트)에 쪼개 각자 맡은 부분을 깊게 본 뒤 결과를 합칩니다. 서브에이전트는 Codex의 native 기능입니다(내장 에이전트 `default`·`worker`·`explorer`). 이 "나눠서 맡기고 합치는" 방식을 dynamic workflow(멀티에이전트)라고 부릅니다.
 
 두 방법의 원리는 같습니다. **AI가 생각을 더 많이 할수록(= 더 많은 "토큰"을 쓸수록) 결과가 좋아진다**
 는 것입니다. (연구에 따르면 성능 차이의 약 80%가 "토큰을 얼마나 썼는가"로 설명됩니다.)
 
-> **⚠️ 출처를 구분합니다.** 위 두 방법과 "+90.2%" 같은 수치는 **Claude(Claude Code Workflow)와
-> Anthropic의 연구에서 가져온 아이디어·결과**입니다. codex-ultracode는 그것을 Codex 환경에 맞게 옮긴
-> 것이며, 그 수치를 Codex에서 다시 측정한 것이 아닙니다. 아래 "이 저장소가 직접 측정한 것"만 우리
-> 벤치마크 결과입니다.
+> **⚠️ 출처를 구분합니다.** `xhigh` 추론 모드와 서브에이전트는 **Codex의 native 기능**입니다(아래 Codex 공식 문서). 다만 이를 "스킬"로 조직하는 워크플로 설계는 **Claude Code Workflow를 참고**한 것이고, "+90.2%" 같은 수치는 **Anthropic 멀티에이전트 연구의 결과**이지 codex-ultracode가 Codex에서 다시 측정한 값이 아닙니다. 아래 "이 저장소가 직접 측정한 것"만 우리 벤치마크 결과입니다.
 
 ### 이 저장소가 직접 측정한 것
 
@@ -152,6 +148,8 @@ xychart-beta
 입니다. 그리고 이 장점은 *버그가 미묘할 때만* 나타납니다. SQL 주입처럼 한눈에 보이는 버그는 한 번
 훑기로도 다 잡힙니다.
 
+> **Codex 문서와도 일치합니다**. Codex 공식 서브에이전트 문서는 서브에이전트가 "코드베이스 탐색이나 여러 비슷한 항목을 감사하는 것처럼 고도로 병렬적인 작업"에 적합하고, "서브에이전트 워크플로는 단일 에이전트 실행보다 토큰을 더 쓴다"고 설명합니다. 이는 우리 벤치마크의 두 결과 — 전수 점검에서 버그를 더 잘 찾음, 그리고 토큰·헛알람 비용 증가 — 와 정확히 들어맞습니다.
+
 ### 정리 — 언제 쓰면 좋은가
 
 | 작업 종류 | 우리 벤치 결과 | 결론 |
@@ -164,7 +162,15 @@ xychart-beta
 **codex-ultracode가 벤치마크로 직접 증명한 장점은 "전수 점검에서 버그를 덜 놓치는 것"이고, 보통
 작업에서는 점수가 같습니다.**
 
-출처(차용한 원리):
+출처:
+
+**Codex 공식 문서**
+- 설정 레퍼런스 (`model_reasoning_effort`): <https://developers.openai.com/codex/config-reference>
+- CLI: <https://developers.openai.com/codex/cli>
+- 서브에이전트: <https://developers.openai.com/codex/subagents>
+- 모범 사례: <https://developers.openai.com/codex/learn/best-practices>
+
+**차용한 원리 (Claude / Anthropic)**
 - Claude effort 문서: <https://platform.claude.com/docs/en/build-with-claude/effort>
 - Anthropic 멀티에이전트 연구: <https://www.anthropic.com/engineering/multi-agent-research-system>
 
@@ -630,18 +636,13 @@ session owns the final integration.
 
 For hard problems, ultracode uses two approaches:
 
-- **Let one worker think longer** — the "think deeply" mode Codex calls `xhigh`.
-- **Split the work across several workers and combine** — the task is divided among several AIs
-  (subagents); each studies its part in depth, then the results are merged. This is called the dynamic
-  workflow (multi-agent) approach.
+- **Let one worker think longer** — Codex's `xhigh` reasoning mode (the `model_reasoning_effort` setting). Codex defaults to medium and recommends xhigh for hard, latency-tolerant tasks.
+- **Split the work across several workers and combine** — the task is divided among subagents that each study their part in depth, then merge results. Subagents are a native Codex feature (built-in `default`/`worker`/`explorer` agents). This split-and-merge approach is what Claude calls the dynamic workflow (multi-agent) approach.
 
 Both share one principle: **the more an AI thinks (the more "tokens" it spends), the better the result.**
 (Research shows ~80% of the performance difference is explained by how many tokens were spent.)
 
-> **⚠️ Source attribution.** The two approaches above and figures like "+90.2%" come from **Claude (Claude
-> Code Workflow) and Anthropic's research** — they are borrowed ideas/results. codex-ultracode adapts them
-> to Codex; it did not re-measure those numbers on Codex. Only the section "What This Repo Measured Directly"
-> below is our own benchmark result.
+> **⚠️ Source attribution.** The `xhigh` reasoning mode and subagents are **native Codex features** (see the Codex docs below). Organizing them into a *skill-driven workflow* follows **Claude Code Workflow**, and figures like "+90.2%" are **Anthropic's multi-agent research results** — not numbers codex-ultracode re-measured on Codex. Only "What This Repo Measured Directly" below is our own benchmark result.
 
 ### What This Repo Measured Directly
 
@@ -713,6 +714,8 @@ all 3 codebases). The cost: **false alarms rose from 5 to 28.** So ultracode's b
 and its cost is "more false alarms to triage." This benefit shows up *only when bugs are subtle*; obvious
 bugs like SQL injection are caught even in a single pass.
 
+> **This matches Codex's own docs.** Codex's official subagents documentation says subagents suit "complex tasks that are highly parallel, such as codebase exploration" and "auditing numerous similar items," and that "subagent workflows consume more tokens than comparable single-agent runs" — exactly our two benchmark results (better at finding bugs in a full audit, at a higher token/false-alarm cost).
+
 ### Summary — When It Is Worth It
 
 | Task type | Our benchmark result | Verdict |
@@ -725,7 +728,15 @@ Full numbers and methodology are in [`bench/REPORT.md`](bench/REPORT.md). In one
 codex-ultracode proved with benchmarks is "missing fewer bugs in a full audit"; on ordinary tasks the score
 is the same.**
 
-Sources (borrowed principle):
+Sources:
+
+**Codex official docs**
+- Config reference (`model_reasoning_effort`): <https://developers.openai.com/codex/config-reference>
+- CLI: <https://developers.openai.com/codex/cli>
+- Subagents: <https://developers.openai.com/codex/subagents>
+- Best practices: <https://developers.openai.com/codex/learn/best-practices>
+
+**Borrowed principle (Claude / Anthropic)**
 - Claude effort docs: <https://platform.claude.com/docs/en/build-with-claude/effort>
 - Anthropic multi-agent research: <https://www.anthropic.com/engineering/multi-agent-research-system>
 
