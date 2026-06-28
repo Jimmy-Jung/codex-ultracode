@@ -39,7 +39,7 @@ Use $ultracode to audit this repository for correctness risks.
 Expected:
 
 - delegated mode with real subagents whenever native agents exist
-- fan-out scaled to the repo, not capped at a small fixed number
+- fan-out scaled to the repo's real breadth (this audit IS decomposable), value-gated rather than maximal-by-default
 - read-only finders run as a `pipeline` or `parallel` wave
 - each non-trivial finding passes an adversarial verify panel (majority rule)
 - a completeness critic pass before the final answer
@@ -201,10 +201,11 @@ change, or avoiding a long-running validation in an interactive turn.
 - Direct mode stays lightweight for trivial work.
 - Ambiguous requests either ask one concise question or proceed with a conservative discovery-first default.
 - Prompt rewrites include goal, scope, mode, constraints, required checks, and output.
-- Substantive work defaults to real subagent fan-out, not minimal single passes.
-- Fan-out scales to the task and respects host runtime limits, with no small fixed cap.
+- Decomposable breadth work (audits, sweeps, multi-file discovery) fans out; coupled single-fix work uses one execution-grounded loop. Fan-out is value-gated, not maximal-by-default (bench/REPORT.md: fan-out raises audit recall but is pure overhead on a single coherent fix).
+- Fan-out scales to the task's real breadth and respects host runtime limits.
 - `pipeline` is the default fan-out shape; barriers appear only with a stated cross-item dependency.
 - Adversarial verification appears on non-trivial claims.
+- Breadth/completeness fan-out filters findings through adversarial verify before reporting; the raw union of agent findings is never forwarded (it trades precision for recall — bench/REPORT.md cycle 5).
 - No Python helpers or invented runners are used; only host-native primitives.
 - Workflow mode creates useful artifacts, including `orchestration.md`.
 - Codex workflow artifacts default to `${CODEX_HOME:-$HOME/.codex}/log/ultracode/<workspace-key>/<run-id>/`; temp roots are fallback only.

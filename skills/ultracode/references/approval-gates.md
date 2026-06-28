@@ -2,7 +2,7 @@
 
 Ask one clear approval question before irreversible or outward-facing work. If approval is absent, continue only with safe read-only work, local drafts, or non-destructive checks.
 
-Under Ultracode, token spend and agent count are not gates. Spend agents and passes freely. Gate on side effects, not on how much compute a safe local task uses.
+Under Ultracode, token spend and agent count are not *approval* gates — gate on side effects, not on how much compute a safe local task uses. Fan-out is still a **value** decision, not an approval one: scale it to whether the extra agents earn their cost. Spend freely on decomposable breadth work (audits, sweeps, multi-file discovery); do not fan out coupled single-fix work, where extra agents only add tokens (see SKILL value-gated posture and `bench/REPORT.md`).
 
 ## Approval required
 

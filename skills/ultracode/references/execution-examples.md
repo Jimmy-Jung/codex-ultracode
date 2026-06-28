@@ -27,7 +27,7 @@ User:
 Use $ultracode to audit this repo for correctness risks.
 ```
 
-Mode: delegated (default for substantive work) when native agents exist.
+Mode: delegated (this audit is decomposable breadth work; fan-out is value-gated, not default for every substantive task) when native agents exist.
 
 Expected behavior:
 
@@ -35,7 +35,7 @@ Expected behavior:
 - Fan out read-only finders scaled to the repo, each searching a different way (multi-modal sweep).
 - Run finders as a `pipeline` so each finding flows into verification as soon as it is found, with no barrier between finding and verifying.
 - Verify each non-trivial finding with an adversarial panel (3-5 independent skeptics, majority rule).
-- Run a completeness critic pass to surface anything missed, then a follow-up wave on what it finds.
+- Run a completeness critic pass to surface anything missed, then a follow-up wave on what it finds. Filter its findings through adversarial verify before reporting — breadth fan-out raises recall but inflates false positives (bench/REPORT.md cycle 5).
 - Keep integration, prioritization, and final claims in the parent session.
 
 Canonical pipeline shape (Claude Code Workflow tool):
