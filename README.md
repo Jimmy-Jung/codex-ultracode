@@ -59,6 +59,115 @@ Ultracode는 다음처럼 놓치는 비용이 큰 작업에 맞습니다.
 핵심 가치는 속도가 아니라 신뢰도입니다. 한 세션이 혼자 결론을 내리지 않고,
 작업을 나누고 독립 검증을 거친 뒤 부모 세션이 책임지고 합칩니다.
 
+## 왜 ultracode를 쓰는가 — 쉬운 설명과 벤치마크 근거
+
+> **한 줄 요약.** 보통의 코드 작업에서는 일반 codex와 점수가 똑같습니다(이건 솔직히 인정합니다).
+> 대신 "코드 전체를 훑어 빠뜨리지 않고 다 찾아야 하는" 작업에서는 더 많이 찾아냅니다. 그 차이를
+> 이 저장소의 벤치마크로 실제로 측정했습니다.
+
+### ultracode가 하는 일 (비유로)
+
+어려운 문제를 풀 때 ultracode는 두 가지 방법을 씁니다.
+
+- **한 명이 더 오래 고민하게 하기** — Codex에서 `xhigh`라고 부르는 "깊게 생각하기" 모드.
+- **여러 명에게 나눠 맡기고 합치기** — 작업을 여러 AI(서브에이전트)에게 쪼개 각자 맡은 부분을 깊게
+  보게 한 뒤 결과를 합칩니다. 이걸 dynamic workflow(멀티에이전트)라고 부릅니다.
+
+두 방법의 원리는 같습니다. **AI가 생각을 더 많이 할수록(= 더 많은 "토큰"을 쓸수록) 결과가 좋아진다**
+는 것입니다. (연구에 따르면 성능 차이의 약 80%가 "토큰을 얼마나 썼는가"로 설명됩니다.)
+
+> **⚠️ 출처를 구분합니다.** 위 두 방법과 "+90.2%" 같은 수치는 **Claude(Claude Code Workflow)와
+> Anthropic의 연구에서 가져온 아이디어·결과**입니다. codex-ultracode는 그것을 Codex 환경에 맞게 옮긴
+> 것이며, 그 수치를 Codex에서 다시 측정한 것이 아닙니다. 아래 "이 저장소가 직접 측정한 것"만 우리
+> 벤치마크 결과입니다.
+
+### 이 저장소가 직접 측정한 것
+
+먼저 용어 세 개만 쉽게 풀어둡니다.
+
+- **recall(찾아낸 비율):** 숨겨 둔 버그 중 실제로 몇 개나 찾았는지. 높을수록 "놓친 게 적다".
+- **헛알람(false positive):** 사실은 문제가 아닌데 "문제다"라고 잘못 보고한 것. 적을수록 좋다.
+- **숨겨 둔 정답(held-out):** 채점할 때만 쓰는, AI에게는 보여 주지 않는 정답. 예를 들어 채점 테스트가
+  요구하는 *정확한 에러 문구* 같은 것.
+
+#### 1. 보통의 코드 수정 → 점수가 똑같습니다 (인정)
+
+업계 표준 시험인 SWE-bench Pro 12문제를 실제 채점기로 돌려 보면, ultracode를 켜든 끄든 결과가
+같았습니다. 12개 중 같은 3개를 맞히고, 틀린 문제까지 똑같았습니다.
+
+```mermaid
+xychart-beta
+    title "SWE-bench Pro 12문제 - 맞힌 개수 (보통 작업): 똑같음"
+    x-axis ["일반 codex", "ultracode"]
+    y-axis "맞힌 개수 (12점 만점)" 0 --> 12
+    bar [3, 3]
+```
+
+| 방법 | 맞힌 개수 |
+| --- | --- |
+| 일반 codex | 3 / 12 |
+| ultracode | 3 / 12 (똑같음, 맞힌 문제까지 동일) |
+
+근거: [`bench/REPORT.md` 사이클 3b·4](bench/REPORT.md) · 원자료
+[`bench/results_pro12.json`](bench/results_pro12.json), [`bench/results_orch12.json`](bench/results_orch12.json)
+
+**왜 차이가 없을까요?** 이 문제들을 틀리는 이유는 "채점 테스트가 요구하는 정확한 에러 문구" 같은
+*숨겨 둔 정답*을 못 맞혀서인데, 그 정답은 AI에게 주어지지 않습니다. **주어지지 않은 정보는 AI를 여러
+명 붙여도 알아낼 수 없습니다.** 그래서 보통의 단일 수정 작업에서는 **ultracode가 토큰만 더 쓰고 점수는
+그대로입니다.** 이 점은 솔직하게 인정합니다.
+
+#### 2. 코드 전체에서 결함을 빠짐없이 찾기 → 여기서 앞섭니다 (벤치로 증명)
+
+반대로 "하나라도 빠뜨리면 실패"인 작업에서는 ultracode가 더 많이 찾아냅니다. 일부러 버그를 심어 둔
+코드베이스 3개(버그 합계 46개)에서, **한 명이 한 번에 훑기**와 **여러 AI로 나눠 훑고 합치기**를
+비교했습니다.
+
+```mermaid
+xychart-beta
+    title "전수 점검 - 버그를 찾아낸 비율 % (높을수록 좋음): ultracode 우위"
+    x-axis ["한 번에 훑기", "ultracode(나눠 훑기)"]
+    y-axis "찾아낸 비율 %" 0 --> 100
+    bar [91.3, 97.8]
+```
+
+```mermaid
+xychart-beta
+    title "전수 점검 - 헛알람 건수 (낮을수록 좋음): ultracode 비용"
+    x-axis ["한 번에 훑기", "ultracode(나눠 훑기)"]
+    y-axis "헛알람 건수" 0 --> 30
+    bar [5, 28]
+```
+
+| 지표 | 한 번에 훑기 | ultracode(나눠 훑기) | 뜻 |
+| --- | --- | --- | --- |
+| 찾아낸 비율(recall) | 46개 중 42개(91.3%) | 46개 중 45개(97.8%) | ultracode가 **버그를 덜 놓칩니다** |
+| 헛알람(false positive) | 5건 | 28건 | ultracode는 **헛알람이 더 많습니다** |
+
+근거: [`bench/REPORT.md` 사이클 5](bench/REPORT.md)
+
+**쉽게 풀면 이렇습니다.** 한 명이 혼자 훑으면 "이만하면 됐다" 하고 미묘한 버그를 놓치곤 합니다.
+일을 여러 AI에게 나눠 맡기면 그 놓친 것까지 잡아내서, **버그를 찾아낸 비율이 91.3%에서 97.8%로
+올랐습니다**(코드베이스 3개 전부에서 더 잘 찾았습니다). 다만 **그 대가로 헛알람이 5건에서 28건으로
+늘었습니다.** 즉 ultracode의 장점은 "빠뜨리지 않는 것", 비용은 "확인해야 할 헛알람이 늘어나는 것"
+입니다. 그리고 이 장점은 *버그가 미묘할 때만* 나타납니다. SQL 주입처럼 한눈에 보이는 버그는 한 번
+훑기로도 다 잡힙니다.
+
+### 정리 — 언제 쓰면 좋은가
+
+| 작업 종류 | 우리 벤치 결과 | 결론 |
+| --- | --- | --- |
+| 보통의 단일 수정 | 점수 동일 | **굳이 쓸 필요 없습니다 (토큰만 더 듭니다)** |
+| 빠짐없이 찾아야 하는 전수 점검·리뷰 | 더 많이 찾음(+6.5%포인트) | **쓸 가치가 있습니다 (단, 헛알람은 감수)** |
+| 파일이 많고 규모가 큰 작업 | Claude 연구상 유리하나, 우리 측정은 아직 | **가능성 있음 (검증 예정)** |
+
+전체 수치와 측정 방법은 [`bench/REPORT.md`](bench/REPORT.md)에 정리돼 있습니다. 한 줄로 요약하면,
+**codex-ultracode가 벤치마크로 직접 증명한 장점은 "전수 점검에서 버그를 덜 놓치는 것"이고, 보통
+작업에서는 점수가 같습니다.**
+
+출처(차용한 원리):
+- Claude effort 문서: <https://platform.claude.com/docs/en/build-with-claude/effort>
+- Anthropic 멀티에이전트 연구: <https://www.anthropic.com/engineering/multi-agent-research-system>
+
 ## 구성 원리
 
 Ultracode의 중심은 "부모 세션이 책임지고, 필요한 일만 하위 에이전트에 나눈다"는
@@ -510,6 +619,115 @@ Ultracode is useful when missing something would be expensive:
 The core value is confidence, not speed. One session does not simply decide on
 its own; it splits the work, gathers independent evidence, and then the parent
 session owns the final integration.
+
+## Why Use Ultracode — Plain Explanation and Benchmark Evidence
+
+> **One-line summary.** On ordinary coding tasks it scores the same as plain codex (we acknowledge this
+> honestly). But on tasks where you must scan the whole codebase and *miss nothing*, it finds more. We
+> measured that difference with this repository's own benchmarks.
+
+### What Ultracode Does (by analogy)
+
+For hard problems, ultracode uses two approaches:
+
+- **Let one worker think longer** — the "think deeply" mode Codex calls `xhigh`.
+- **Split the work across several workers and combine** — the task is divided among several AIs
+  (subagents); each studies its part in depth, then the results are merged. This is called the dynamic
+  workflow (multi-agent) approach.
+
+Both share one principle: **the more an AI thinks (the more "tokens" it spends), the better the result.**
+(Research shows ~80% of the performance difference is explained by how many tokens were spent.)
+
+> **⚠️ Source attribution.** The two approaches above and figures like "+90.2%" come from **Claude (Claude
+> Code Workflow) and Anthropic's research** — they are borrowed ideas/results. codex-ultracode adapts them
+> to Codex; it did not re-measure those numbers on Codex. Only the section "What This Repo Measured Directly"
+> below is our own benchmark result.
+
+### What This Repo Measured Directly
+
+Three terms, in plain words first:
+
+- **recall:** of the hidden bugs, how many were actually found. Higher = "missed less".
+- **false positive (false alarm):** reporting something as a problem when it actually is not. Lower = better.
+- **held-out answer:** the answer used only for grading and never shown to the AI — e.g. the *exact* error
+  string a grading test requires.
+
+#### 1. Ordinary code fixes -> identical score (acknowledged)
+
+On the industry-standard SWE-bench Pro (12 problems, real grader), ultracode on or off gave the same result:
+the same 3 of 12 solved, down to the same failing problems.
+
+```mermaid
+xychart-beta
+    title "SWE-bench Pro 12 problems - solved (ordinary tasks): identical"
+    x-axis ["plain codex", "ultracode"]
+    y-axis "solved (out of 12)" 0 --> 12
+    bar [3, 3]
+```
+
+| Method | Solved |
+| --- | --- |
+| plain codex | 3 / 12 |
+| ultracode | 3 / 12 (identical, same problems) |
+
+Evidence: [`bench/REPORT.md` cycles 3b & 4](bench/REPORT.md) · raw data
+[`bench/results_pro12.json`](bench/results_pro12.json), [`bench/results_orch12.json`](bench/results_orch12.json)
+
+**Why no difference?** These problems fail because of a *held-out answer* — like the exact error string a
+grading test wants — that is never given to the AI. **You cannot recover information that was not provided,
+no matter how many AIs you add.** So on ordinary single fixes, **ultracode only spends more tokens for the
+same score.** We acknowledge this plainly.
+
+#### 2. Finding every defect across the codebase -> it wins here (proven by benchmark)
+
+Conversely, on "miss-one-and-you-fail" tasks, ultracode finds more. Across 3 codebases with deliberately
+planted bugs (46 total), we compared **one worker scanning in a single pass** vs **several AIs splitting,
+scanning, and merging**.
+
+```mermaid
+xychart-beta
+    title "Full audit - % of bugs found (higher is better): ultracode wins"
+    x-axis ["single pass", "ultracode (split)"]
+    y-axis "found %" 0 --> 100
+    bar [91.3, 97.8]
+```
+
+```mermaid
+xychart-beta
+    title "Full audit - false alarms (lower is better): ultracode cost"
+    x-axis ["single pass", "ultracode (split)"]
+    y-axis "false positives" 0 --> 30
+    bar [5, 28]
+```
+
+| Metric | single pass | ultracode (split) | Meaning |
+| --- | --- | --- | --- |
+| recall (found) | 42 of 46 (91.3%) | 45 of 46 (97.8%) | ultracode **misses fewer bugs** |
+| false positives | 5 | 28 | ultracode **has more false alarms** |
+
+Evidence: [`bench/REPORT.md` cycle 5](bench/REPORT.md)
+
+**In plain terms:** one worker scanning alone tends to stop at "good enough" and miss subtle bugs. Splitting
+the work across several AIs catches those, raising **the share of bugs found from 91.3% to 97.8%** (better in
+all 3 codebases). The cost: **false alarms rose from 5 to 28.** So ultracode's benefit is "missing nothing,"
+and its cost is "more false alarms to triage." This benefit shows up *only when bugs are subtle*; obvious
+bugs like SQL injection are caught even in a single pass.
+
+### Summary — When It Is Worth It
+
+| Task type | Our benchmark result | Verdict |
+| --- | --- | --- |
+| Ordinary single fix | identical score | **Not worth it (only more tokens)** |
+| Miss-nothing full audit / review | finds more (+6.5 points) | **Worth it (but accept more false alarms)** |
+| Many files / large scale | favored by Claude's research; not yet measured here | **Possible (to be verified)** |
+
+Full numbers and methodology are in [`bench/REPORT.md`](bench/REPORT.md). In one sentence: **the advantage
+codex-ultracode proved with benchmarks is "missing fewer bugs in a full audit"; on ordinary tasks the score
+is the same.**
+
+Sources (borrowed principle):
+- Claude effort docs: <https://platform.claude.com/docs/en/build-with-claude/effort>
+- Anthropic multi-agent research: <https://www.anthropic.com/engineering/multi-agent-research-system>
 
 ## How It Works
 

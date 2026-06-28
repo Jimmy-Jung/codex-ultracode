@@ -14,6 +14,7 @@ The core value is *confidence earned by execution evidence*, not maximal agent c
 - Be exhaustive about understanding the problem and proving the fix. Be deliberate, not maximal, about spawning agents.
 - Spend extra agents/passes when task value or risk justifies it. Do NOT fan out simple or coupled tasks: for multi-agent runs token usage explains most of the cost variance, and unjustified fan-out buys cost without correctness.
 - Scale effort to the task: a one-file fix is one execution-grounded loop; a broad audit is a bounded panel; a multi-phase feature is sequenced workflows (understand → design → implement → review).
+- The fan-out payoff is task-shaped (measured, `bench/REPORT.md`): it raises coverage/recall on decomposable breadth work — exhaustive audits, sweeps, multi-file discovery — but adds ~nothing on a single coherent fix a strong model already lands, where it only burns tokens. On single-fix tasks whose discriminator is information you do not have (held-out tests, exact strings), no fan-out can recover it. Choose the mode by task shape, not ambition.
 - Never claim to be an official Claude/OpenAI/Google feature. Ultracode is a skill, not a runtime.
 
 ## Mode selection
@@ -48,6 +49,7 @@ If native subagents are unavailable, run the planned packets sequentially in one
 - Run adversarial verification on non-trivial findings: independent skeptics, majority rule, each prompted to REFUTE and default to "not a real issue" unless they can concretely confirm it.
 - Critics and completeness passes flag ONLY gaps/defects affecting correctness or stated requirements. Style, speculative hardening, and "could be more robust" are explicitly out of scope — a critic told to "find what's missing" otherwise manufactures problems.
 - **Cap adversarial/critic rounds at 2.** Agreement is reached early; extra rounds induce drift and degrade results. Stop when no new correctness-affecting finding appears.
+- Breadth/completeness fan-out trades precision for recall (measured: +recall but several times more false positives). Never forward the raw union of agent findings — every reported item must first survive the adversarial "default to not a real issue" gate above. A longer list is not a better one; the recall gain only counts if you pay back the precision with this filter.
 
 ## Sandbox / network reality
 
