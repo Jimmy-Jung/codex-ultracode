@@ -12,3 +12,6 @@ bench/*.log
 bench/tasks_pro/
 bench/tasks_pro3/
 bench/tasks_pro12/
+bench/tasks_pro10/
+bench/preds_*/
+bench/preds/

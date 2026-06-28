@@ -208,7 +208,20 @@ xychart-beta
 | collections (자료구조) | 14 | 13/14 | 14/14 | 0 | 4 |
 | **합계** | **46** | **42 (91.3%)** | **45 (97.8%)** | **5** | **28** |
 
-사이클 6은 같은 46버그를 24파일(188줄)로 합쳐 측정(solo 43/46, orch 44/46) — 이점 미미. 사이클 7은 같은 24파일을 13,460줄로 키워 측정: **solo 32/46(69.6%) vs 팬아웃 44/46(95.7%) — +12버그**(부피가 클수록 이점↑). 재현 절차는 [`bench/recall/README.md`](bench/recall/README.md).
+사이클 6은 같은 46버그를 24파일(188줄)로 합쳐 측정(solo 43/46, orch 44/46) — 이점 미미. 사이클 7은 같은 24파일을 13,460줄로 키워 측정: **solo 32/46(69.6%) vs 팬아웃 44/46(95.7%) — +12버그**(부피가 클수록 이점↑). **effort × arm 매트릭스 (SWE-bench Pro 10인스턴스, ansible 제외)**
+
+| effort | arm | resolved | 평균 토큰(total) |
+| --- | --- | :-: | --: |
+| medium | solo | 3/10 | 1.37M |
+| medium | ultracode | 3/10 | 1.49M |
+| high | solo | 3/10 | 1.82M |
+| high | ultracode | 3/10 | 2.13M |
+| xhigh | solo | 3/10 | 3.17M |
+| xhigh | ultracode | 3/10 | 3.10M |
+
+6개 조건 전부 **resolved 3/10, 같은 인스턴스**. effort를 medium→xhigh로 올리면 토큰은 약 2.3배 늘지만 정확도는 그대로고, ultracode도 모든 effort에서 solo와 동률(토큰만 paired 1.08~1.16배 더). Pro 실패는 held-out 정보 문제라 추론을 더 해도(effort↑), 스킬을 줘도 못 푼다 — 두 레버 모두 토큰만 더 쓸 뿐.
+
+재현 절차는 재현 절차는 [`bench/recall/README.md`](bench/recall/README.md).
 
 </details>
 
@@ -845,7 +858,20 @@ Solved **3/12** (NodeBB, openlibrary-92db3454, qutebrowser-34a13). solo and orch
 | collections | 14 | 13/14 | 14/14 | 0 | 4 |
 | **total** | **46** | **42 (91.3%)** | **45 (97.8%)** | **5** | **28** |
 
-Cycle 6 merges the same 46 bugs into one 24-file codebase at 188 lines (solo 43/46, orch 44/46) — negligible gain. Cycle 7 grows those 24 files to 13,460 lines: **solo 32/46 (69.6%) vs fan-out 44/46 (95.7%) — +12 bugs** (the advantage grows with volume). Reproduction: [`bench/recall/README.md`](bench/recall/README.md).
+Cycle 6 merges the same 46 bugs into one 24-file codebase at 188 lines (solo 43/46, orch 44/46) — negligible gain. Cycle 7 grows those 24 files to 13,460 lines: **solo 32/46 (69.6%) vs fan-out 44/46 (95.7%) — +12 bugs** (the advantage grows with volume). **effort x arm matrix (SWE-bench Pro, 10 instances, ansible excluded)**
+
+| effort | arm | resolved | avg tokens (total) |
+| --- | --- | :-: | --: |
+| medium | solo | 3/10 | 1.37M |
+| medium | ultracode | 3/10 | 1.49M |
+| high | solo | 3/10 | 1.82M |
+| high | ultracode | 3/10 | 2.13M |
+| xhigh | solo | 3/10 | 3.17M |
+| xhigh | ultracode | 3/10 | 3.10M |
+
+All 6 conditions resolve **3/10, the same instances**. Raising effort medium->xhigh costs ~2.3x tokens with zero accuracy change, and ultracode ties solo at every effort (only 1.08-1.16x more tokens, paired). Pro failures are held-out-information problems: neither more reasoning (higher effort) nor the skill can solve them — both only spend more tokens.
+
+Reproduction: Reproduction: [`bench/recall/README.md`](bench/recall/README.md).
 
 </details>
 

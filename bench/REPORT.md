@@ -364,3 +364,30 @@ resolved delta = **+12버그(+26.1%p)** — 전 사이클 최대.
 **정직한 한계:** 107K 토큰은 크지만 Opus 컨텍스트 창(200K+) 안이라 "하드 윈도 초과"는 아니다 — 모델이
 다 읽을 수는 있으나 큰 부피에서 주의가 분산됐다. 추세(188줄 +1버그 → 13,460줄 +12버그)는 "부피가
 클수록 fan-out 우위가 커진다"를 강하게 지지하며, 진짜 윈도 초과(>200K 토큰)에서는 더 벌어질 것으로 예상된다.
+
+---
+
+# 사이클 8 - effort × arm 매트릭스: 더 깊은 추론이 Pro 정확도를 높이는가? (아니오)
+
+medium/high/xhigh × {solo, ultracode}를 SWE-bench Pro 10인스턴스(ansible 2개 제외, 순차 생성)에서
+측정. codex effort를 `model_reasoning_effort`로 고정, 토큰은 turn.completed.usage 합산(`_parse_tokens` 수정).
+
+| effort | arm | resolved | 평균 토큰(total) |
+|---|---|---|---|
+| medium | solo | 3/10 | 1.37M |
+| medium | ultracode | 3/10 | 1.49M |
+| high | solo | 3/10 | 1.82M |
+| high | ultracode | 3/10 | 2.13M |
+| xhigh | solo | 3/10 | 3.17M |
+| xhigh | ultracode | 3/10 | 3.10M |
+
+토큰 배수(paired, 공통 인스턴스): ultracode/solo total = medium 1.08×, high 1.16×, xhigh 1.15×
+(생성 토큰 out+reasoning = 1.21× / 1.11× / 1.28×).
+
+**발견:** 6개 조건 전부 **resolved 3/10, 완전히 같은 인스턴스**(NodeBB, openlibrary-92db3454, qutebrowser).
+- effort medium→xhigh: 평균 토큰 ~2.3배 증가하나 resolved 변화 **0**.
+- ultracode vs solo: 모든 effort에서 **동률**, 토큰만 8~16% 더.
+
+**해석:** Pro 실패는 held-out 정보(정확한 에러 문자열·fixture 등) 추측 문제라, 추론을 더 해도(effort↑)
+스킬을 줘도 풀 수 없다. 두 레버 모두 토큰 비용만 늘릴 뿐 정확도를 못 높인다 — 사이클 4의 정보 상한을
+effort 축으로 확장 확인. (단, 토큰 사용량 차이 자체는 명확히 측정됨: effort·스킬 모두 토큰을 더 씀.)
