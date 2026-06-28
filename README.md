@@ -156,7 +156,8 @@ xychart-beta
 | --- | --- | --- |
 | 보통의 단일 수정 | 점수 동일 | **굳이 쓸 필요 없습니다 (토큰만 더 듭니다)** |
 | 빠짐없이 찾아야 하는 전수 점검·리뷰 | 더 많이 찾음(+6.5%포인트) | **쓸 가치가 있습니다 (단, 헛알람은 감수)** |
-| 파일이 많고 규모가 큰 작업 | Claude 연구상 유리하나, 우리 측정은 아직 | **가능성 있음 (검증 예정)** |
+| 파일이 많은 작업 (24파일·188줄, 측정함) | 이점이 노이즈 수준(+1버그)으로 축소, 헛알람 비용은 지속 | **파일 수만으론 이점이 안 커짐** (사이클 6) |
+| 진짜 대규모 (수만 줄, 컨텍스트 초과) | 미측정 — Claude 연구상 유리(차용한 원리) | 미검증 |
 
 전체 수치와 측정 방법은 [`bench/REPORT.md`](bench/REPORT.md)에 정리돼 있습니다. 한 줄로 요약하면,
 **codex-ultracode가 벤치마크로 직접 증명한 장점은 "전수 점검에서 버그를 덜 놓치는 것"이고, 보통
@@ -722,7 +723,8 @@ bugs like SQL injection are caught even in a single pass.
 | --- | --- | --- |
 | Ordinary single fix | identical score | **Not worth it (only more tokens)** |
 | Miss-nothing full audit / review | finds more (+6.5 points) | **Worth it (but accept more false alarms)** |
-| Many files / large scale | favored by Claude's research; not yet measured here | **Possible (to be verified)** |
+| Many files (24 files, 188 lines, measured) | advantage shrinks to noise (+1 bug); false-alarm cost persists | **More files alone does not grow the advantage** (cycle 6) |
+| True large scale (tens of thousands of lines, exceeds context) | not measured — favored by Claude's research (borrowed principle) | unverified |
 
 Full numbers and methodology are in [`bench/REPORT.md`](bench/REPORT.md). In one sentence: **the advantage
 codex-ultracode proved with benchmarks is "missing fewer bugs in a full audit"; on ordinary tasks the score
