@@ -204,3 +204,101 @@ flipt, qutebrowser, tutanota)에 걸친 Pro instance 12개의 strided sample을 
 adversarial verification이 전혀 실행되지 않는다. 운영 *규칙*만 주입하는 것으로는 강한 단일
 모델의 결과를 바꾸지 못했다. 그 레버를 테스트하려면 실제로 subagent를 생성하는 host와,
 통계적 검정력을 갖춘 더 큰 Pro 표본이 필요하다.
+
+---
+
+# 사이클 4 - 실제 멀티에이전트 레버(`orch` arm)가 *정확성*을 높이는가? (Modal 실채점)
+
+**배경:** 사이클 1–3b는 스킬을 *컨텍스트 주입*으로만 측정했다(`codex exec` single-session).
+스킬의 진짜 레버(서브에이전트 팬아웃 + 독립 적대적 검증 + best-of-N)는 발동되지 않았다.
+사이클 4는 그 레버를 **실제 codex 서브프로세스로** 발동시키는 `orch` arm을 새로 만들어,
+SWE-bench Pro n=12에서 정확성 우위가 나오는지 직접 실측했다.
+
+## 레버 빌드 전: 가설을 적대적으로 검증 (싸게)
+
+"confident-wrong 실패(flipt/navidrome/tutanota/webclients-0200)는 명세 위반이므로
+verify→repair로 전환 가능"이라는 가설을 세우고, **빌드 전에** 적대적 검증 패널(4 인스턴스,
+회의적 검증자)로 반증을 시도했다.
+
+- 패널 판정: spec-observable 위반 **1/4**(flipt만, 신뢰도 0.55).
+- **flipt ground truth 대조**(데이터셋 gold patch + hidden test): hidden 테스트는
+  `assert.EqualError(err, "unsupported version: 5.0")`처럼 **에러 문자열 바이트 일치**를
+  요구한다. 실패 패치는 의미는 맞지만 다른 문구(`"unsupported document version %q..."`)를
+  써서 실패했다. 문제 명세는 정확한 문구를 주지 않는다(**held-out 정보**). 또한
+  `interface{}` vs `ImportOpt`는 상위집합이라 컴파일·통과되는 **red herring**이었다.
+- **결론:** Pro 실패는 명세 위반이 아니라 held-out 정보(정확 에러 문자열·테스트 fixture·
+  명세가 고정 안 한 행동 해석) 때문이다. 따라서 어떤 오케스트레이션 레버도 *없는 정보*를
+  복원할 수 없다. → 그럼에도 "null을 실측으로 확정"하기 위해 레버를 빌드해 채점했다.
+
+## orch arm (이 사이클에서 구현)
+
+`bench/orch.py`: best-of-N 후보 생성(독립 codex 프로세스) → 각 후보를 독립 적대적
+검증(codex read-only + 구조화 스키마, 명세·암시 계약 위반 나열) → 위반 최소 후보 선택 →
+repair(위반만 국소 수정). base 모델 = codex 고정(solo와 깨끗한 A/B). candidate 0은 solo
+패치로 **시딩**(무회귀 가드). 다양성 nudge가 held-out 관심사(정확 문구·엣지케이스)를
+정조준해 레버에 **최선의 기회**를 부여(공정한 null). N=3, 600s 캡.
+
+## 결과 (Modal 공식 하니스 실채점, n=12)
+
+| 지표 | solo (사이클 3b) | **orch (사이클 4)** |
+|---|---|---|
+| **resolved** | **3/12 (25.0%)** | **3/12 (25.0%)** |
+| 해결 instance | NodeBB-04998908, openlibrary-92db3454, qutebrowser-34a13 | **완전히 동일** |
+| 회귀(solo PASS→fail) | — | **0** |
+| 신규 전환(solo fail→PASS) | — | **0** |
+| 생성 비용/instance | codex 1회 | codex 5~8회(생성3+검증3+repair) |
+
+confident-wrong 4개(flipt·navidrome·tutanota·webclients-0200)는 best-of-3 + 적대적 검증 +
+repair에도 **전부 여전히 실패**. repair가 시딩된 정답(NodeBB)을 깨지도 않았다(무회귀 가드 작동).
+
+**발견:** 실제 레버를 발동시켜도 정확성은 **단일 패스 solo와 정확히 동률**이며, instance별
+결과도 완전히 일치한다. ground truth가 예측한 그대로다 — held-out 정보는 팬아웃·적대적
+검증·best-of-N 어느 것으로도 복원되지 않는다. 비용만 5~8배 더 들었다.
+
+## 최종 판정 (사이클 1–4)
+
+| 주장 | 상태 | 근거 |
+|---|---|---|
+| v2는 동일 품질에서 원본(560줄)보다 6배 저렴 | **입증** | 사이클 1 |
+| v2는 정확성을 회귀시키지 않는다 | **입증** | 사이클 3b: Pro n=12, 3/12==3/12 |
+| 스킬(규칙 주입)이 Pro 정확성을 높인다 | **반증** | 사이클 1–3b: 전 구간 동률 |
+| **실제 멀티에이전트 레버가 Pro 정확성을 높인다** | **반증(실측)** | **사이클 4: orch 3/12 == solo 3/12, 동일 instance, 전환 0** |
+
+**결론:** ultracode의 가치(검증 규율·완전성·과신 차단)는 **SWE-bench Pro가 측정하는 축과
+다르다(계측기 불일치)**. Pro 실패는 held-out 정보 추측 문제이고, 이는 오케스트레이션이
+고치는 실패 모드(과신 band-aid·breadth-first 누락·무규율)가 아니다. 이는 ultracode의 결함이
+아니라 벤치마크-가치 불일치다. 정직한 결론: **검증된 승리(6배 저렴·무회귀)를 출시하고,
+정확도 우위는 레버가 실제로 먹히는 아레나(주입 결함 감사·완전성 recall·유효 selector가
+있는 best-of-N)에서 측정해야 한다 — Pro에서는 아니다.**
+
+---
+
+# 사이클 5 - 스킬 레버가 *어디서* 효과를 내는가: 전수 결함 감사 recall (로컬, 3 코드베이스)
+
+**배경:** 사이클 4까지는 SWE-bench Pro(단일 응집 수정)에서만 측정 → 전 구간 동률. 가설: 스킬의
+fan-out 레버는 Pro가 측정하지 않는 *breadth-first 완전성*에서 효과를 낸다. 이를 직접 검증했다.
+
+**설정:** 같은 모델(Claude) A/B. solo = 1 에이전트가 코드베이스 전체를 1회 감사. skill = 파일을
+분할해 3 서브에이전트 팬아웃 + 완전성 비평. 결함을 심은 3개 코드베이스(일반 utils / http·web /
+collections), 총 46개 심은 버그. 채점 = blind 채점자가 발견분을 ground truth에 매칭 → recall + 거짓양성(FP).
+
+| 코드베이스 | solo recall | solo FP | skill recall | skill FP |
+|---|---|---|---|---|
+| utils (미묘한 버그) | 15/18 | 5 | 17/18 | 16 |
+| http/web (명백한 보안버그) | 14/14 | 0 | 14/14 | 8 |
+| collections (혼합) | 13/14 | 0 | 14/14 | 4 |
+| **합계** | **42/46 (91.3%)** | **5** | **45/46 (97.8%)** | **28** |
+
+**발견:** 팬아웃 레버는 recall을 **91.3%→97.8% (+3버그)**로 올렸다 — 방향은 일관(skill ≥ solo 전
+시행). 단 효과는 *조건부*다: 버그가 미묘해 단일 패스가 satisfice할 때만 이득(utils·collections),
+명백한 버그(http 보안)엔 solo가 이미 완벽 → 이득 0. 그리고 **거짓양성이 5→28 (5.6배)로 모든
+시행에서 일관 폭증** — 완전성 비평이 noise를 양산("비평가가 문제를 지어낸다"의 정량화). F1로는
+보통 solo가 우위.
+
+**판정:** 스킬은 무의미하지 않다 — 단 **"하나도 놓치면 안 되는 전수 감사"** 도구다. recall이 생명이고
+FP triage가 감당되는 고위험 완전성 작업에서 가치가 있고, "깔끔한 실행 목록"이 목적이면 precision
+비용이 역효과다. 이는 "이점은 작업 종류로 층화해야 보인다"(README 이점·비용)와 SKILL의 "가치 비례
+팬아웃"을 실측으로 뒷받침한다. SKILL은 이에 따라 breadth 팬아웃 발견을 보고 전 적대 검증으로
+거짓양성을 거르도록 강화됐다.
+
+**주의:** N=3 코드베이스, 시행당 14~18 버그, 단일 회차 → directional. 절대 마진(+3/46)은 작다.

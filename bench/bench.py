@@ -259,11 +259,19 @@ def cmd_run(args):
     tasks = load_tasks(Path(args.tasks))
     runs = []
     arms = (args.arm,) if getattr(args, "arm", "both") != "both" else ("solo", "ultracode")
+    seed_patches = {}
+    if "orch" in arms:
+        import orch
+        seed_patches = orch.load_seed_patches(getattr(args, "seed_from", None))
     for task in tasks:
         for seed in range(args.repeats):
             for arm in arms:
                 print(f"[run] task={task['id']} arm={arm} seed={seed} ...", flush=True)
-                rec = run_arm(task, arm, seed)
+                if arm == "orch":
+                    import orch
+                    rec = orch.run_orch(task, seed, getattr(args, "orch_n", orch.ORCH_N), seed_patches)
+                else:
+                    rec = run_arm(task, arm, seed)
                 o = rec["objective"]["resolved"]
                 ov = rec["rubric"].get("overall")
                 print(f"      resolved={o} rubric_overall={ov} elapsed={rec['elapsed_s']}s", flush=True)
@@ -277,9 +285,9 @@ def cmd_run(args):
 def cmd_stats(args):
     data = json.loads(Path(args.results).read_text())
     runs = data["runs"]
-    arms = {"solo": [], "ultracode": []}
+    arms = {}
     for r in runs:
-        arms[r["arm"]].append(r)
+        arms.setdefault(r["arm"], []).append(r)
 
     def resolved_rate(rs):
         vals = [1.0 if r["objective"]["resolved"] else 0.0 for r in rs
@@ -291,7 +299,7 @@ def cmd_stats(args):
         return (statistics.mean(vals) if vals else None), len(vals)
 
     print("\n=== PAIRED A/B RESULTS ===")
-    for arm in ("solo", "ultracode"):
+    for arm in sorted(arms):
         rr, n1 = resolved_rate(arms[arm])
         rm, n2 = rubric_mean(arms[arm])
         avg_tok = _avg([r["tokens"] for r in arms[arm] if r["tokens"]])
@@ -362,7 +370,11 @@ def main():
     pr.add_argument("--tasks", default="bench/tasks")
     pr.add_argument("--repeats", type=int, default=1)
     pr.add_argument("--out", default="bench/results.json")
-    pr.add_argument("--arm", choices=["solo", "ultracode", "both"], default="both")
+    pr.add_argument("--arm", choices=["solo", "ultracode", "orch", "both"], default="both")
+    pr.add_argument("--orch-n", type=int, default=int(os.environ.get("BENCH_ORCH_N", "3")),
+                    help="orch candidates per instance (incl. seeded candidate 0)")
+    pr.add_argument("--seed-from", default=None,
+                    help="results.json whose solo patches seed orch candidate 0 (no-regression guard)")
     pr.set_defaults(func=cmd_run)
     ps = sub.add_parser("stats", help="recompute stats from a results file")
     ps.add_argument("results")

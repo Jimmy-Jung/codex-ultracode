@@ -85,12 +85,13 @@ def cmd_score_cmd(args):
     # so an Apple-Silicon Mac with little disk works — Mac only needs Python + Modal auth.
     # Pass --local-docker only on a Linux x86_64 box with ~120GB free.
     local = "  --use_local_docker\n" if args.local_docker else "\n"
+    arms = sorted(q.stem for q in Path(args.preds).glob("*.json")) or ["solo", "ultracode", "orch"]
     print("# one-time setup on the Mac:")
     print("#   git clone https://github.com/scaleapi/SWE-bench_Pro-os && cd SWE-bench_Pro-os")
     print("#   pip install -r requirements.txt")
     if not args.local_docker:
         print("#   modal setup        # browser auth; free Starter tier has $30/mo credit\n")
-    for arm in ("solo", "ultracode"):
+    for arm in arms:
         print(
             f"# {arm}:\n"
             f"python swe_bench_pro_eval.py \\\n"
@@ -111,7 +112,8 @@ def cmd_ingest(args):
     res_path = Path(args.results)
     data = json.loads(res_path.read_text())
     scored = {}
-    for arm in ("solo", "ultracode"):
+    arms = sorted({r["arm"] for r in data["runs"]})
+    for arm in arms:
         p = Path(args.harness_out) / f"{arm}.resolved.json"
         if p.exists():
             scored[arm] = json.loads(p.read_text())
