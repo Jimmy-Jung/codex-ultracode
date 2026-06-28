@@ -1,0 +1,22 @@
+class LRUCache:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.data = {}
+        self.order = []
+
+    def get(self, key):
+        if key in self.data:
+            self.order.remove(key)
+            self.order.append(key)
+            return self.data[key]
+        return None
+
+    def put(self, key, value):
+        if key in self.data:
+            self.data[key] = value
+            return
+        if len(self.data) > self.capacity:
+            oldest = self.order.pop(0)
+            del self.data[oldest]
+        self.data[key] = value
+        self.order.append(key)

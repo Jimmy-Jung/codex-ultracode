@@ -1,0 +1,103 @@
+{
+  "n_bugs": 14,
+  "bugs": [
+    {
+      "id": "D1",
+      "file": "dedup.py",
+      "symbol": "dedup",
+      "type": "performance",
+      "desc": "O(n^2) membership scan on a list; use a set for seen"
+    },
+    {
+      "id": "D2",
+      "file": "dedup.py",
+      "symbol": "unique_keys",
+      "type": "correctness",
+      "desc": "dict(pairs) silently keeps LAST duplicate key; earlier values lost without warning"
+    },
+    {
+      "id": "D3",
+      "file": "chunk.py",
+      "symbol": "chunk",
+      "type": "correctness",
+      "desc": "size==0 raises/ infinite intent; no guard for size<=0"
+    },
+    {
+      "id": "D4",
+      "file": "chunk.py",
+      "symbol": "take",
+      "type": "correctness",
+      "desc": "negative n silently returns wrong slice; not validated"
+    },
+    {
+      "id": "D5",
+      "file": "merge.py",
+      "symbol": "deep_merge",
+      "type": "correctness",
+      "desc": "not a deep merge: nested dicts overwritten instead of merged"
+    },
+    {
+      "id": "D6",
+      "file": "merge.py",
+      "symbol": "deep_merge",
+      "type": "correctness",
+      "desc": "mutates input dict 'a' in place (side effect)"
+    },
+    {
+      "id": "D7",
+      "file": "topn.py",
+      "symbol": "top_n",
+      "type": "correctness",
+      "desc": "n>len returns all silently; n negative returns wrong slice; no guard"
+    },
+    {
+      "id": "D8",
+      "file": "topn.py",
+      "symbol": "top_n",
+      "type": "performance",
+      "desc": "full sort O(n log n) for top-n; heapq.nlargest intended for large n"
+    },
+    {
+      "id": "D9",
+      "file": "stats.py",
+      "symbol": "mean",
+      "type": "correctness",
+      "desc": "empty list -> ZeroDivisionError; no guard"
+    },
+    {
+      "id": "D10",
+      "file": "stats.py",
+      "symbol": "variance",
+      "type": "correctness",
+      "desc": "divides by n (population); sample variance needs n-1; also crashes on empty"
+    },
+    {
+      "id": "D11",
+      "file": "flatten.py",
+      "symbol": "flatten",
+      "type": "correctness",
+      "desc": "strings are iterable -> split into chars; only flattens one level"
+    },
+    {
+      "id": "D12",
+      "file": "groupby.py",
+      "symbol": "group_by",
+      "type": "correctness",
+      "desc": "KeyError: groups[k] accessed before init; needs setdefault/defaultdict"
+    },
+    {
+      "id": "D13",
+      "file": "sample.py",
+      "symbol": "sample",
+      "type": "correctness",
+      "desc": "sampling WITH replacement (random.choice repeats); 'sample' implies without replacement"
+    },
+    {
+      "id": "D14",
+      "file": "sample.py",
+      "symbol": "shuffle",
+      "type": "correctness",
+      "desc": "sorting by random key is a biased/improper shuffle; use random.shuffle"
+    }
+  ]
+}

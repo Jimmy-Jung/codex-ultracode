@@ -1,0 +1,131 @@
+{
+  "n_bugs": 18,
+  "bugs": [
+    {
+      "id": "B1",
+      "file": "auth.py",
+      "symbol": "check_password",
+      "type": "security",
+      "desc": "string == on hash is non-constant-time (timing attack); use hmac.compare_digest"
+    },
+    {
+      "id": "B2",
+      "file": "auth.py",
+      "symbol": "hash_password",
+      "type": "validation",
+      "desc": "empty/short password accepted; no length check"
+    },
+    {
+      "id": "B3",
+      "file": "cache.py",
+      "symbol": "LRUCache.put",
+      "type": "correctness",
+      "desc": "updating existing key does not refresh LRU recency order"
+    },
+    {
+      "id": "B4",
+      "file": "cache.py",
+      "symbol": "LRUCache.put",
+      "type": "correctness",
+      "desc": "eviction uses > capacity (off-by-one): stores capacity+1 items"
+    },
+    {
+      "id": "B5",
+      "file": "pagination.py",
+      "symbol": "paginate",
+      "type": "correctness",
+      "desc": "off-by-one: page*per_page skips first page (1-indexed needs (page-1))"
+    },
+    {
+      "id": "B6",
+      "file": "pagination.py",
+      "symbol": "total_pages",
+      "type": "correctness",
+      "desc": "integer division drops remainder; last partial page lost (needs ceil)"
+    },
+    {
+      "id": "B7",
+      "file": "money.py",
+      "symbol": "add_amounts",
+      "type": "correctness",
+      "desc": "float arithmetic for currency causes rounding errors; use Decimal/int cents"
+    },
+    {
+      "id": "B8",
+      "file": "money.py",
+      "symbol": "apply_discount",
+      "type": "validation",
+      "desc": "pct not bounded to [0,100] and negative price not rejected"
+    },
+    {
+      "id": "B9",
+      "file": "money.py",
+      "symbol": "split_bill",
+      "type": "correctness",
+      "desc": "division by zero when n==0 not handled"
+    },
+    {
+      "id": "B10",
+      "file": "parser.py",
+      "symbol": "parse_kv",
+      "type": "correctness",
+      "desc": "split without maxsplit=1 breaks values containing '='"
+    },
+    {
+      "id": "B11",
+      "file": "parser.py",
+      "symbol": "parse_list",
+      "type": "correctness",
+      "desc": "no strip; empty input yields [''] instead of []"
+    },
+    {
+      "id": "B12",
+      "file": "ratelimit.py",
+      "symbol": "RateLimiter.allow",
+      "type": "concurrency",
+      "desc": "non-atomic check-then-set allows bursts over limit under concurrency"
+    },
+    {
+      "id": "B13",
+      "file": "csv_export.py",
+      "symbol": "to_csv",
+      "type": "correctness",
+      "desc": "fields with commas/quotes/newlines not escaped -> corrupt CSV"
+    },
+    {
+      "id": "B14",
+      "file": "csv_export.py",
+      "symbol": "to_csv_cell",
+      "type": "security",
+      "desc": "CSV formula injection: leading =,+,-,@ not neutralized"
+    },
+    {
+      "id": "B15",
+      "file": "dates.py",
+      "symbol": "is_expired",
+      "type": "correctness",
+      "desc": "naive datetime.now() compared to possibly tz-aware expiry -> wrong/raises"
+    },
+    {
+      "id": "B16",
+      "file": "dates.py",
+      "symbol": "days_between",
+      "type": "correctness",
+      "desc": "returns negative for reversed args; no abs/ordering guard"
+    },
+    {
+      "id": "B17",
+      "file": "config.py",
+      "symbol": "load",
+      "type": "correctness",
+      "desc": "mutable default argument shared across calls"
+    },
+    {
+      "id": "B18",
+      "file": "config.py",
+      "symbol": "load",
+      "type": "correctness",
+      "desc": "env var read as string, not cast to bool/int"
+    }
+  ]
+}

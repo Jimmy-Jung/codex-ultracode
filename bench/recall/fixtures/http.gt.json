@@ -1,0 +1,103 @@
+{
+  "n_bugs": 14,
+  "bugs": [
+    {
+      "id": "U1",
+      "file": "url.py",
+      "symbol": "build_url",
+      "type": "security",
+      "desc": "query params not URL-encoded (injection / breakage on special chars)"
+    },
+    {
+      "id": "U2",
+      "file": "url.py",
+      "symbol": "join_path",
+      "type": "correctness",
+      "desc": "no handling of trailing/leading slash -> double slash '//' in URL"
+    },
+    {
+      "id": "U3",
+      "file": "headers.py",
+      "symbol": "get_header",
+      "type": "correctness",
+      "desc": "HTTP header lookup is case-sensitive; must be case-insensitive"
+    },
+    {
+      "id": "U4",
+      "file": "headers.py",
+      "symbol": "parse_cookie",
+      "type": "correctness",
+      "desc": "split('=') breaks cookie values containing '='; need maxsplit=1; value not stripped"
+    },
+    {
+      "id": "U5",
+      "file": "resp.py",
+      "symbol": "is_ok",
+      "type": "correctness",
+      "desc": "only 200 treated ok; 201/204/2xx wrongly treated as failure"
+    },
+    {
+      "id": "U6",
+      "file": "resp.py",
+      "symbol": "parse_json",
+      "type": "validation",
+      "desc": "no content-type/empty-body check before json.loads -> crashes on non-JSON"
+    },
+    {
+      "id": "U7",
+      "file": "session.py",
+      "symbol": "valid_token",
+      "type": "security",
+      "desc": "token compared with == (non-constant-time); use compare_digest"
+    },
+    {
+      "id": "U8",
+      "file": "session.py",
+      "symbol": "is_active",
+      "type": "correctness",
+      "desc": "'remember' flag bypasses expiry entirely -> expired sessions stay active"
+    },
+    {
+      "id": "U9",
+      "file": "query.py",
+      "symbol": "find_user",
+      "type": "security",
+      "desc": "SQL injection via string concatenation; use parameterized query"
+    },
+    {
+      "id": "U10",
+      "file": "query.py",
+      "symbol": "page_query",
+      "type": "security",
+      "desc": "limit concatenated into SQL; not validated/parameterized"
+    },
+    {
+      "id": "U11",
+      "file": "redirect.py",
+      "symbol": "safe_redirect",
+      "type": "security",
+      "desc": "open redirect: target not validated against an allowlist"
+    },
+    {
+      "id": "U12",
+      "file": "redirect.py",
+      "symbol": "make_absolute",
+      "type": "correctness",
+      "desc": "startswith('http') also matches 'httpevil.com'; weak scheme check"
+    },
+    {
+      "id": "U13",
+      "file": "form.py",
+      "symbol": "get_bool",
+      "type": "correctness",
+      "desc": "bool('false') is True; string 'false'/'0' wrongly truthy"
+    },
+    {
+      "id": "U14",
+      "file": "form.py",
+      "symbol": "require",
+      "type": "validation",
+      "desc": "'in form' passes for empty-string values; presence != non-empty"
+    }
+  ]
+}
