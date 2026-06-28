@@ -59,7 +59,7 @@ Ultracode는 다음처럼 놓치는 비용이 큰 작업에 맞습니다.
 핵심 가치는 속도가 아니라 신뢰도입니다. 한 세션이 혼자 결론을 내리지 않고,
 작업을 나누고 독립 검증을 거친 뒤 부모 세션이 책임지고 합칩니다.
 
-## 왜 ultracode를 쓰는가 — 쉬운 설명과 벤치마크 근거
+## 왜 ultracode를 쓰는가
 
 > **한 줄 요약.** 보통의 코드 작업에서는 일반 codex와 점수가 똑같습니다(이건 솔직히 인정합니다).
 > 대신 "코드 전체를 훑어 빠뜨리지 않고 다 찾아야 하는" 작업에서는 더 많이 찾아냅니다. 그 차이를
@@ -76,6 +76,13 @@ Ultracode는 다음처럼 놓치는 비용이 큰 작업에 맞습니다.
 는 것입니다. (연구에 따르면 성능 차이의 약 80%가 "토큰을 얼마나 썼는가"로 설명됩니다.)
 
 > **⚠️ 출처를 구분합니다.** `xhigh` 추론 모드와 서브에이전트는 **Codex의 native 기능**입니다(아래 Codex 공식 문서). 다만 이를 "스킬"로 조직하는 워크플로 설계는 **Claude Code Workflow를 참고**한 것이고, "+90.2%" 같은 수치는 **Anthropic 멀티에이전트 연구의 결과**이지 codex-ultracode가 Codex에서 다시 측정한 값이 아닙니다. 아래 "이 저장소가 직접 측정한 것"만 우리 벤치마크 결과입니다.
+
+<details>
+<summary>🔬 전문가용 — AI 엔지니어를 위한 심화</summary>
+
+두 엔진은 **test-time compute**(추론 시점 연산)를 키우는 두 축입니다. 엔진 1(`xhigh`)은 한 정책의 *순차적* 사고 깊이(reasoning-token 예산)를 늘리고, 엔진 2(서브에이전트)는 *병렬* 표본 수와 유효 컨텍스트를 늘립니다. Anthropic이 보고한 "토큰 사용량이 분산의 ~80% 설명"은 test-time scaling 곡선의 한 단면으로, 두 축이 같은 곡선을 다른 방향으로 탑니다. 단 축별 한계 효용은 작업의 **분해 가능성**과 **검증 가능성**에 따라 급변하며(아래 측정) 무조건 단조 증가가 아닙니다. 비용 모델: 서브에이전트는 컨텍스트를 공유하지 않아 조정 비용과 per-agent 토큰이 곱으로 늘어 약 15배 토큰(Anthropic 보고치)입니다.
+
+</details>
 
 ### 이 저장소가 직접 측정한 것
 
@@ -111,6 +118,13 @@ xychart-beta
 *숨겨 둔 정답*을 못 맞혀서인데, 그 정답은 AI에게 주어지지 않습니다. **주어지지 않은 정보는 AI를 여러
 명 붙여도 알아낼 수 없습니다.** 그래서 보통의 단일 수정 작업에서는 **ultracode가 토큰만 더 쓰고 점수는
 그대로입니다.** 이 점은 솔직하게 인정합니다.
+
+<details>
+<summary>🔬 전문가용 — AI 엔지니어를 위한 심화</summary>
+
+이 동률은 오케스트레이션 실패가 아니라 **정보 이론적 상한**입니다. SWE-bench Pro의 판정 신호(FAIL_TO_PASS의 `assert.EqualError` 등)는 에이전트의 관측 입력에 존재하지 않는 held-out 사양이라, 과제가 입력만으로 과소결정(underdetermined)됩니다. 팬아웃·적대 검증·best-of-N은 탐색으로 줄일 수 있는 epistemic 불확실성에는 듣지만, 여기 실패는 줄일 수 없는 aleatoric 사양 모호성입니다. best-of-N도 선택을 위한 **유효한 in-distribution oracle**(예: 풍부한 PASS_TO_PASS)이 있어야 작동하는데 Pro 인스턴스는 그게 비어 있는 경우가 많습니다(flipt `pass_to_pass=[]`). flipt gold patch 대조로 확인: 에이전트는 의미상 동치지만 어휘가 다른 에러 문자열을 내 byte-exact 매칭에 실패했습니다.
+
+</details>
 
 #### 2. 코드 전체에서 결함을 빠짐없이 찾기 → 여기서 앞섭니다 (벤치로 증명)
 
@@ -150,6 +164,54 @@ xychart-beta
 
 > **Codex 문서와도 일치합니다**. Codex 공식 서브에이전트 문서는 서브에이전트가 "코드베이스 탐색이나 여러 비슷한 항목을 감사하는 것처럼 고도로 병렬적인 작업"에 적합하고, "서브에이전트 워크플로는 단일 에이전트 실행보다 토큰을 더 쓴다"고 설명합니다. 이는 우리 벤치마크의 두 결과 — 전수 점검에서 버그를 더 잘 찾음, 그리고 토큰·헛알람 비용 증가 — 와 정확히 들어맞습니다.
 
+<details>
+<summary>🔬 전문가용 — AI 엔지니어를 위한 심화</summary>
+
+이는 탐지 과제의 **recall–precision 트레이드오프**입니다. 팬아웃은 per-chunk 주의를 유지해 단일 패스의 satisficing(조기 종료)과 attention decay를 완화하여 recall을 올리지만, 완전성 비평은 false-discovery rate도 함께 끌어올립니다(이 크기대에선 F1이 오히려 solo 우위). 최적 동작점은 **비용 비대칭**이 결정합니다 — miss 비용이 triage 비용보다 훨씬 크면(보안·규정 감사) 고-recall 설정이 정당하고, 반대면 solo가 낫습니다. 그래서 SKILL은 breadth 팬아웃 산출을 보고 전에 **생성기/검증기 분리**(적대 검증 게이트, 기본값=문제 아님)로 통과시켜 precision 세금을 일부 환원합니다.
+
+</details>
+
+<details>
+<summary>📋 벤치마크 상세 — 설정 · 해결 인스턴스 · 재현 정보</summary>
+
+**측정 설정**
+
+- **사이클 1–4 (SWE-bench Pro A/B):** base = `codex` CLI **0.133.0**. 모델과 reasoning effort를 하니스에서 **고정하지 않음** → codex 기본값(문서상 medium) 사용. 생성 타임아웃 420–600초, `approval_policy="never"`, `workspace-write`. 채점 = Modal에서 공식 Scale 하니스 `swe_bench_pro_eval.py`(`jefzda` 이미지) 실행, resolved = FAIL_TO_PASS ∪ PASS_TO_PASS 전부 통과.
+- **사이클 5–6 (전수 감사 recall):** 양 arm 모두 **Claude Opus 4.8**(세션 모델), effort = **xhigh**(세션 `/effort ultracode`; 워크플로 서브에이전트는 메인 루프 모델·effort를 상속). 별도 에이전트가 blind 채점.
+- 데이터셋: `ScaleAI/SWE-bench_Pro` (test split), strided n=12. 감사 픽스처: `bench/recall/fixtures/`.
+
+**SWE-bench Pro 12문제 — 무엇을 풀었나** (solo·orch 결과가 instance별로 완전히 동일)
+
+| 인스턴스 | repo | 언어 | solo | orch |
+| --- | --- | --- | :-: | :-: |
+| NodeBB-04998908 | NodeBB/NodeBB | js | ✅ | ✅ |
+| openlibrary-92db3454 | internetarchive/openlibrary | python | ✅ | ✅ |
+| qutebrowser-34a13afd | qutebrowser/qutebrowser | python | ✅ | ✅ |
+| flipt-c6a7b1fd | flipt-io/flipt | go | ❌ | ❌ |
+| navidrome-8d56ec89 | navidrome/navidrome | go | ❌ | ❌ |
+| openlibrary-7f6b722a | internetarchive/openlibrary | python | ❌ | ❌ |
+| openlibrary-910b0857 | internetarchive/openlibrary | python | ❌ | ❌ |
+| webclients-0200ce0f | protonmail/webclients | ts | ❌ | ❌ |
+| webclients-e9677f6c | protonmail/webclients | ts | ❌ | ❌ |
+| tutanota-db90ac26 | tutao/tutanota | ts | ❌ | ❌ |
+| ansible-5e88cd99 | ansible/ansible | python | ⬜ 빈 패치 | n/a |
+| ansible-7e1a3476 | ansible/ansible | python | ⬜ 빈 패치 | n/a |
+
+해결 **3/12** (NodeBB, openlibrary-92db3454, qutebrowser-34a13). solo·orch 동일. ansible 2개는 repo가 과대해 타임아웃 캡 안에서 양 arm 모두 빈 패치 → 대칭 제외.
+
+**전수 감사 recall — 픽스처별** (사이클 5, 같은 모델/effort 양 arm)
+
+| 픽스처 (도메인) | 심은 버그 | solo recall | orch recall | solo FP | orch FP |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| utils (일반) | 18 | 15/18 | 17/18 | 5 | 16 |
+| http (웹) | 14 | 14/14 | 14/14 | 0 | 8 |
+| collections (자료구조) | 14 | 13/14 | 14/14 | 0 | 4 |
+| **합계** | **46** | **42 (91.3%)** | **45 (97.8%)** | **5** | **28** |
+
+사이클 6은 같은 46버그를 24파일 한 코드베이스로 합쳐 측정(solo 43/46, orch 44/46). 재현 절차는 [`bench/recall/README.md`](bench/recall/README.md).
+
+</details>
+
 ### 정리 — 언제 쓰면 좋은가
 
 | 작업 종류 | 우리 벤치 결과 | 결론 |
@@ -162,6 +224,13 @@ xychart-beta
 전체 수치와 측정 방법은 [`bench/REPORT.md`](bench/REPORT.md)에 정리돼 있습니다. 한 줄로 요약하면,
 **codex-ultracode가 벤치마크로 직접 증명한 장점은 "전수 점검에서 버그를 덜 놓치는 것"이고, 보통
 작업에서는 점수가 같습니다.**
+
+<details>
+<summary>🔬 전문가용 — AI 엔지니어를 위한 심화</summary>
+
+운영 규칙은 본질적으로 **연산 배분 정책**입니다: 기대 한계 recall × miss 비용 > 추가 토큰 + FP triage 비용일 때만 팬아웃합니다. Codex 서브에이전트 문서가 비용 측면("단일 에이전트보다 토큰을 더 씀")을 1차 출처로 확증합니다. 타당성 위협(threats to validity): 조건당 단일 시행(LLM 비결정성), 합성 코드베이스, 그리고 결정적으로 총량이 컨텍스트 창 안이라 "진짜 컨텍스트 초과" regime은 미검증입니다 — 그 영역의 한계 효용은 차용한 원리(Claude)로만 뒷받침되며 자체 측정이 남은 과제입니다.
+
+</details>
 
 출처:
 
@@ -627,7 +696,7 @@ The core value is confidence, not speed. One session does not simply decide on
 its own; it splits the work, gathers independent evidence, and then the parent
 session owns the final integration.
 
-## Why Use Ultracode — Plain Explanation and Benchmark Evidence
+## Why Use Ultracode
 
 > **One-line summary.** On ordinary coding tasks it scores the same as plain codex (we acknowledge this
 > honestly). But on tasks where you must scan the whole codebase and *miss nothing*, it finds more. We
@@ -644,6 +713,13 @@ Both share one principle: **the more an AI thinks (the more "tokens" it spends),
 (Research shows ~80% of the performance difference is explained by how many tokens were spent.)
 
 > **⚠️ Source attribution.** The `xhigh` reasoning mode and subagents are **native Codex features** (see the Codex docs below). Organizing them into a *skill-driven workflow* follows **Claude Code Workflow**, and figures like "+90.2%" are **Anthropic's multi-agent research results** — not numbers codex-ultracode re-measured on Codex. Only "What This Repo Measured Directly" below is our own benchmark result.
+
+<details>
+<summary>🔬 For AI engineers — technical deep dive</summary>
+
+The two engines are two axes of **test-time compute**. Engine 1 (`xhigh`) increases one policy's *sequential* reasoning depth (reasoning-token budget); Engine 2 (subagents) increases *parallel* sample count and effective context. Anthropic's "~80% of variance explained by token usage" is a slice of the test-time scaling curve — both axes ride the same curve in different directions. But per-axis marginal utility depends sharply on the task's **decomposability** and **verifiability** (measured below); it is not unconditionally monotonic. Cost model: subagents do not share context, so coordination plus per-agent tokens compound to ~15x tokens (Anthropic's figure).
+
+</details>
 
 ### What This Repo Measured Directly
 
@@ -679,6 +755,13 @@ Evidence: [`bench/REPORT.md` cycles 3b & 4](bench/REPORT.md) · raw data
 grading test wants — that is never given to the AI. **You cannot recover information that was not provided,
 no matter how many AIs you add.** So on ordinary single fixes, **ultracode only spends more tokens for the
 same score.** We acknowledge this plainly.
+
+<details>
+<summary>🔬 For AI engineers — technical deep dive</summary>
+
+This tie is an **information ceiling, not an orchestration failure**. SWE-bench Pro's decision signal (e.g. FAIL_TO_PASS `assert.EqualError`) is a held-out spec absent from the agent's observable inputs, so the task is underdetermined from inputs alone. Fan-out / adversarial verify / best-of-N reduce epistemic uncertainty (searchable), but these failures are irreducible aleatoric spec ambiguity. best-of-N also needs a **valid in-distribution oracle** (e.g. rich PASS_TO_PASS) to select on — and Pro instances often lack one (flipt `pass_to_pass=[]`). Confirmed against flipt's gold patch: the agent emitted a semantically-equivalent but lexically different error string, so byte-exact matching failed.
+
+</details>
 
 #### 2. Finding every defect across the codebase -> it wins here (proven by benchmark)
 
@@ -717,6 +800,54 @@ bugs like SQL injection are caught even in a single pass.
 
 > **This matches Codex's own docs.** Codex's official subagents documentation says subagents suit "complex tasks that are highly parallel, such as codebase exploration" and "auditing numerous similar items," and that "subagent workflows consume more tokens than comparable single-agent runs" — exactly our two benchmark results (better at finding bugs in a full audit, at a higher token/false-alarm cost).
 
+<details>
+<summary>🔬 For AI engineers — technical deep dive</summary>
+
+This is a detection-task **recall–precision tradeoff**. Fan-out preserves per-chunk attention, mitigating single-pass satisficing and attention decay to raise recall — but the completeness critic also raises the false-discovery rate (F1 actually favors solo at these sizes). The optimal operating point is set by **cost asymmetry**: when miss-cost >> triage-cost (security/compliance audits) the high-recall setting is justified; otherwise solo wins. Hence the SKILL routes breadth fan-out output through a **generator/verifier split** (an adversarial-verify gate defaulting to "not a real issue") before reporting, clawing back part of the precision tax.
+
+</details>
+
+<details>
+<summary>📋 Benchmark details — config, solved instances, reproduction</summary>
+
+**Configuration**
+
+- **Cycles 1–4 (SWE-bench Pro A/B):** base = `codex` CLI **0.133.0**. Model and reasoning effort were **not pinned** by the harness → codex defaults (medium per the docs). Generation timeout 420–600s, `approval_policy="never"`, `workspace-write`. Grading = official Scale harness `swe_bench_pro_eval.py` on Modal (`jefzda` images); resolved = all of FAIL_TO_PASS ∪ PASS_TO_PASS pass.
+- **Cycles 5–6 (audit recall):** both arms = **Claude Opus 4.8** (session model), effort = **xhigh** (session `/effort ultracode`; workflow subagents inherit the main-loop model/effort). A separate agent grades blind.
+- Dataset: `ScaleAI/SWE-bench_Pro` (test split), strided n=12. Audit fixtures: `bench/recall/fixtures/`.
+
+**SWE-bench Pro 12 problems — what was solved** (solo and orch are identical per instance)
+
+| Instance | repo | lang | solo | orch |
+| --- | --- | --- | :-: | :-: |
+| NodeBB-04998908 | NodeBB/NodeBB | js | ✅ | ✅ |
+| openlibrary-92db3454 | internetarchive/openlibrary | python | ✅ | ✅ |
+| qutebrowser-34a13afd | qutebrowser/qutebrowser | python | ✅ | ✅ |
+| flipt-c6a7b1fd | flipt-io/flipt | go | ❌ | ❌ |
+| navidrome-8d56ec89 | navidrome/navidrome | go | ❌ | ❌ |
+| openlibrary-7f6b722a | internetarchive/openlibrary | python | ❌ | ❌ |
+| openlibrary-910b0857 | internetarchive/openlibrary | python | ❌ | ❌ |
+| webclients-0200ce0f | protonmail/webclients | ts | ❌ | ❌ |
+| webclients-e9677f6c | protonmail/webclients | ts | ❌ | ❌ |
+| tutanota-db90ac26 | tutao/tutanota | ts | ❌ | ❌ |
+| ansible-5e88cd99 | ansible/ansible | python | ⬜ empty patch | n/a |
+| ansible-7e1a3476 | ansible/ansible | python | ⬜ empty patch | n/a |
+
+Solved **3/12** (NodeBB, openlibrary-92db3454, qutebrowser-34a13). solo and orch identical. The two ansible instances are too large; both arms produced empty patches within the timeout cap → symmetrically excluded.
+
+**Audit recall — per fixture** (cycle 5, same model/effort in both arms)
+
+| Fixture (domain) | planted bugs | solo recall | orch recall | solo FP | orch FP |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| utils (general) | 18 | 15/18 | 17/18 | 5 | 16 |
+| http (web) | 14 | 14/14 | 14/14 | 0 | 8 |
+| collections | 14 | 13/14 | 14/14 | 0 | 4 |
+| **total** | **46** | **42 (91.3%)** | **45 (97.8%)** | **5** | **28** |
+
+Cycle 6 merges the same 46 bugs into one 24-file codebase (solo 43/46, orch 44/46). Reproduction: [`bench/recall/README.md`](bench/recall/README.md).
+
+</details>
+
 ### Summary — When It Is Worth It
 
 | Task type | Our benchmark result | Verdict |
@@ -729,6 +860,13 @@ bugs like SQL injection are caught even in a single pass.
 Full numbers and methodology are in [`bench/REPORT.md`](bench/REPORT.md). In one sentence: **the advantage
 codex-ultracode proved with benchmarks is "missing fewer bugs in a full audit"; on ordinary tasks the score
 is the same.**
+
+<details>
+<summary>🔬 For AI engineers — technical deep dive</summary>
+
+The operating rule is essentially a **compute-allocation policy**: fan out only when expected marginal recall × miss-cost > added tokens + FP-triage cost. Codex's subagents doc corroborates the cost side ("more tokens than a comparable single-agent run") as a primary source. Threats to validity: single trial per condition (LLM nondeterminism), synthetic codebases, and — critically — total size fits the context window, so the true "exceeds-context" regime is untested; its marginal utility rests only on the borrowed principle (Claude) and remains ours to measure.
+
+</details>
 
 Sources:
 
