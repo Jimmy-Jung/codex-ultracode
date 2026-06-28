@@ -210,6 +210,23 @@ xychart-beta
 
 사이클 6은 같은 46버그를 24파일(188줄)로 합쳐 측정(solo 43/46, orch 44/46) — 이점 미미. 사이클 7은 같은 24파일을 13,460줄로 키워 측정: **solo 32/46(69.6%) vs 팬아웃 44/46(95.7%) — +12버그**(부피가 클수록 이점↑). **effort × arm 매트릭스 (SWE-bench Pro 10인스턴스, ansible 제외)**
 
+```mermaid
+xychart-beta
+    title "resolved: 전 조건 3/10 (effort·스킬 모두 정확도 영향 없음)"
+    x-axis ["med-solo", "med-ultra", "high-solo", "high-ultra", "xhi-solo", "xhi-ultra"]
+    y-axis "resolved / 10" 0 --> 10
+    bar [3, 3, 3, 3, 3, 3]
+```
+
+```mermaid
+xychart-beta
+    title "effort별 평균 토큰(M) — 막대=ultracode, 선=solo: effort 오르면 비용만 증가"
+    x-axis ["medium", "high", "xhigh"]
+    y-axis "평균 토큰 (백만)" 0 --> 4
+    bar [1.49, 2.13, 3.10]
+    line [1.37, 1.82, 3.17]
+```
+
 | effort | arm | resolved | 평균 토큰(total) |
 | --- | --- | :-: | --: |
 | medium | solo | 3/10 | 1.37M |
@@ -859,6 +876,23 @@ Solved **3/12** (NodeBB, openlibrary-92db3454, qutebrowser-34a13). solo and orch
 | **total** | **46** | **42 (91.3%)** | **45 (97.8%)** | **5** | **28** |
 
 Cycle 6 merges the same 46 bugs into one 24-file codebase at 188 lines (solo 43/46, orch 44/46) — negligible gain. Cycle 7 grows those 24 files to 13,460 lines: **solo 32/46 (69.6%) vs fan-out 44/46 (95.7%) — +12 bugs** (the advantage grows with volume). **effort x arm matrix (SWE-bench Pro, 10 instances, ansible excluded)**
+
+```mermaid
+xychart-beta
+    title "resolved: 3/10 across all conditions (neither effort nor skill helps)"
+    x-axis ["med-solo", "med-ultra", "high-solo", "high-ultra", "xhi-solo", "xhi-ultra"]
+    y-axis "resolved / 10" 0 --> 10
+    bar [3, 3, 3, 3, 3, 3]
+```
+
+```mermaid
+xychart-beta
+    title "avg tokens (M) by effort - bar=ultracode, line=solo: more effort, only more cost"
+    x-axis ["medium", "high", "xhigh"]
+    y-axis "avg tokens (millions)" 0 --> 4
+    bar [1.49, 2.13, 3.10]
+    line [1.37, 1.82, 3.17]
+```
 
 | effort | arm | resolved | avg tokens (total) |
 | --- | --- | :-: | --: |
