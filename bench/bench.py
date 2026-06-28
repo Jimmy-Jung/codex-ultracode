@@ -140,7 +140,7 @@ def run_arm(task: dict, arm: str, seed: int) -> dict:
     elapsed = time.time() - t0
 
     patch = _git(repo, "diff", "HEAD", capture=True)
-    tokens = _parse_tokens(events)
+    usage = _parse_tokens(events)
 
     objective = score_objective(task, repo)
     rubric = score_rubric(task, patch) if patch.strip() else _empty_rubric("no changes made")
@@ -149,7 +149,8 @@ def run_arm(task: dict, arm: str, seed: int) -> dict:
     return {
         "arm": arm, "seed": seed, "task": task["id"], "effort": BENCH_EFFORT or "default",
         "timed_out": timed_out, "elapsed_s": round(elapsed, 1),
-        "tokens": tokens, "patch_bytes": len(patch), "patch": patch,
+        "tokens": (usage["total"] if usage else None), "usage": usage,
+        "patch_bytes": len(patch), "patch": patch,
         "objective": objective, "rubric": rubric,
     }
 
@@ -219,26 +220,36 @@ def _git(repo: Path, *args: str, capture: bool = False) -> str:
     return r.stdout if capture else ""
 
 
-def _parse_tokens(events: Path) -> int | None:
-    """Best-effort: pull the largest token-usage int from codex --json events.
+def _parse_tokens(events: Path) -> dict | None:
+    """Sum codex token usage across turn.completed events.
 
-    Schema-tolerant on purpose: codex event field names drift across versions,
-    so we never depend on this for correctness, only for a rough cost column.
+    codex 0.133.0 emits, per turn:
+      {"type":"turn.completed","usage":{"input_tokens","cached_input_tokens",
+       "output_tokens","reasoning_output_tokens"}}
+    There is no single total_* field, so we sum per-turn usage. Returns
+    {input, cached_input, output, reasoning, total, turns} or None.
     """
     if not events.exists():
         return None
-    best = None
+    agg = {"input": 0, "cached_input": 0, "output": 0, "reasoning": 0, "turns": 0}
+    found = False
     for line in events.read_text(errors="ignore").splitlines():
         try:
             o = json.loads(line)
         except json.JSONDecodeError:
             continue
-        for key in ("total_tokens", "tokens", "total_token_usage"):
-            v = _deep_get_int(o, key)
-            if v is not None:
-                best = v if best is None else max(best, v)
-    return best
-
+        u = o.get("usage") if isinstance(o, dict) else None
+        if isinstance(u, dict) and ("input_tokens" in u or "output_tokens" in u):
+            found = True
+            agg["turns"] += 1
+            agg["input"] += u.get("input_tokens") or 0
+            agg["cached_input"] += u.get("cached_input_tokens") or 0
+            agg["output"] += u.get("output_tokens") or 0
+            agg["reasoning"] += u.get("reasoning_output_tokens") or 0
+    if not found:
+        return None
+    agg["total"] = agg["input"] + agg["output"] + agg["reasoning"]
+    return agg
 
 def _deep_get_int(o, key):
     if isinstance(o, dict):
