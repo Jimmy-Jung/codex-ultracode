@@ -38,6 +38,7 @@ from pathlib import Path
 
 # ---- config knobs (no magic numbers buried in code) -------------------------
 CODEX_TIMEOUT_S = int(os.environ.get("BENCH_CODEX_TIMEOUT", "900"))
+BENCH_EFFORT = os.environ.get("BENCH_EFFORT", "")  # codex model_reasoning_effort: ""=default, or medium/high/xhigh
 TEST_TIMEOUT_S = int(os.environ.get("BENCH_TEST_TIMEOUT", "300"))
 ULTRACODE_TRIGGER = os.environ.get("BENCH_ULTRA_TRIGGER", "$ultracode")
 # The ultracode arm injects the skill's operating rules directly (a skill IS context
@@ -122,6 +123,7 @@ def run_arm(task: dict, arm: str, seed: int) -> dict:
         "--skip-git-repo-check",
         "-s", "workspace-write",
         "-c", "approval_policy=\"never\"",
+        *(["-c", f'model_reasoning_effort="{BENCH_EFFORT}"'] if BENCH_EFFORT else []),
         "--json",
         "-o", str(last_msg),
         "-",  # read the prompt from stdin
@@ -145,7 +147,7 @@ def run_arm(task: dict, arm: str, seed: int) -> dict:
 
     shutil.rmtree(work, ignore_errors=True)
     return {
-        "arm": arm, "seed": seed, "task": task["id"],
+        "arm": arm, "seed": seed, "task": task["id"], "effort": BENCH_EFFORT or "default",
         "timed_out": timed_out, "elapsed_s": round(elapsed, 1),
         "tokens": tokens, "patch_bytes": len(patch), "patch": patch,
         "objective": objective, "rubric": rubric,
