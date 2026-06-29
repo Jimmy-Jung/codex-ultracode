@@ -5,6 +5,25 @@
 
 이 문서는 `codex-ultracode`의 사용자에게 보이는 변경 사항을 기록한다.
 
+## [1.0.1] - 2026-06-29
+
+### Changed
+
+- README를 한국어 단독 단일 페이지로 재작성했다(영어 절과 `<details>` 토글 전부 제거).
+- 플러그인 manifest 버전을 `1.0.1`로 올렸다.
+
+### Added
+
+- README 최상단에 "한눈에 — 가장 큰 장점" 요약과 벤치마크 그래프(대규모 감사 recall: 일반 codex 69.6% vs ultracode 95.7%, 사이클 7)를 추가했다.
+- "배경" 절(Codex·스킬·서브에이전트·fan-out·토큰·SWE-bench Pro 용어 설명)과 "장점과 단점" 절을 추가했다.
+- 벤치 8사이클 실측을 본문에 정리하고(단일 수정 동률·effort 무관·감사 recall·부피가 변수), 전문 용어에 괄호 부연을 전면 보강했다.
+
+### Verified
+
+- `python3 -m json.tool .codex-plugin/plugin.json`
+- `node --check scripts/ultracode-doctor-logs.mjs`
+- `git diff --check`
+
 ## [1.0.0] - 2026-06-23
 
 ### Added
