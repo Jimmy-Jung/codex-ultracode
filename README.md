@@ -736,21 +736,21 @@ README는 입문용입니다. 실제 에이전트가 따라야 하는 운영 규
 session log, `history.jsonl`, `session_index.jsonl`, SQLite database는 읽지 않습니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.1 --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.2 --json
 ```
 
 다른 프로젝트에서 설치된 플러그인의 cache를 직접 점검할 때는 플러그인 root를 절대 경로로 잡습니다.
 
 ```bash
-PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-ultracode/codex-ultracode/1.0.1"
-node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 1.0.1 --json
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-ultracode/codex-ultracode/1.0.2"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 1.0.2 --json
 ```
 
 완료된 run만 모아 release gate(배포 전 통과 여부를 막는 관문)로 볼 때는 `--terminal-only`와
 `--fail-on warning`을 함께 씁니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.1 --terminal-only --fail-on warning --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.2 --terminal-only --fail-on warning --json
 ```
 
 주요 검사 항목: `state.json`/`metrics.json` parse 가능 여부, 필수 artifact 존재, status enum,
@@ -1572,22 +1572,22 @@ Ultracode-owned logs under `${CODEX_HOME:-$HOME/.codex}/log/ultracode`; it does 
 private session logs, `history.jsonl`, `session_index.jsonl`, or SQLite databases.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.1 --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.2 --json
 ```
 
 To inspect an installed plugin cache from another project, point at the plugin root by absolute
 path.
 
 ```bash
-PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-ultracode/codex-ultracode/1.0.1"
-node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 1.0.1 --json
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-ultracode/codex-ultracode/1.0.2"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 1.0.2 --json
 ```
 
 As a release gate (a gate that blocks before shipping) over completed runs only, use
 `--terminal-only` together with `--fail-on warning`.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.1 --terminal-only --fail-on warning --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.2 --terminal-only --fail-on warning --json
 ```
 
 Main checks: whether `state.json`/`metrics.json` parse, required artifacts exist, the status enum

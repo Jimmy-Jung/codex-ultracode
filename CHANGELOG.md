@@ -5,6 +5,24 @@
 
 이 문서는 `codex-ultracode`의 사용자에게 보이는 변경 사항을 기록한다.
 
+## [1.0.2] - 2026-06-29
+
+### Added
+
+- README에 영어 버전을 추가했다(상단 언어 nav + 하단 `# Ultracode (English)` 전체 미러). 한 페이지 바이링궐 구조.
+- 영어판도 mermaid 차트 9종·표·수치를 한국어판과 1:1로 맞췄다.
+
+### Changed
+
+- 플러그인 manifest 버전을 `1.0.2`로 올렸다.
+- README의 로그 점검 예시 버전을 `1.0.2`로 정렬했다.
+
+### Verified
+
+- `python3 -m json.tool .codex-plugin/plugin.json`
+- `node --check scripts/ultracode-doctor-logs.mjs`
+- `git diff --check`
+
 ## [1.0.1] - 2026-06-29
 
 ### Changed
