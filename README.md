@@ -1,5 +1,7 @@
 # Ultracode
 
+**Language / 언어:** 한국어 · [English ↓](#ultracode-english)
+
 ## 한눈에 — 가장 큰 장점
 
 **대규모 코드를 "버그 하나도 놓치면 안 되게" 감사할 때, 혼자 훑는 AI는 절반 가까이 놓치지만
@@ -734,21 +736,21 @@ README는 입문용입니다. 실제 에이전트가 따라야 하는 운영 규
 session log, `history.jsonl`, `session_index.jsonl`, SQLite database는 읽지 않습니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.0 --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.1 --json
 ```
 
 다른 프로젝트에서 설치된 플러그인의 cache를 직접 점검할 때는 플러그인 root를 절대 경로로 잡습니다.
 
 ```bash
-PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-ultracode/codex-ultracode/1.0.0"
-node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 1.0.0 --json
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-ultracode/codex-ultracode/1.0.1"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 1.0.1 --json
 ```
 
 완료된 run만 모아 release gate(배포 전 통과 여부를 막는 관문)로 볼 때는 `--terminal-only`와
 `--fail-on warning`을 함께 씁니다.
 
 ```bash
-node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.0 --terminal-only --fail-on warning --json
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.1 --terminal-only --fail-on warning --json
 ```
 
 주요 검사 항목: `state.json`/`metrics.json` parse 가능 여부, 필수 artifact 존재, status enum,
@@ -797,3 +799,841 @@ node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.0 --terminal-only --
 ## 라이선스
 
 MIT License를 따릅니다. 자세한 내용은 `LICENSE`를 확인하세요.
+
+---
+---
+
+# Ultracode (English)
+
+**Language / 언어:** [한국어 ↑](#ultracode) · English
+
+## TL;DR — the single biggest advantage
+
+**When you audit a large codebase where "missing even one bug is a failure," an AI scanning
+alone misses nearly half — Ultracode catches almost all of them.**
+
+```mermaid
+xychart-beta
+    title "Large codebase (13,460 lines) defect audit — % of bugs found (higher is better)"
+    x-axis ["plain codex (solo scan)", "Ultracode (split scan)"]
+    y-axis "found %" 0 --> 100
+    bar [69.6, 95.7]
+```
+
+On the same code (24 files / 13,460 lines, 46 deliberately planted bugs), plain codex scanning
+alone in one pass found **69.6% (missed 14)**, while Ultracode — splitting the work across
+several AIs — found **95.7% (+12 more bugs)**. **The larger the code volume, the wider this gap**
+(188 lines → +1 bug; 13,460 lines → +12 bugs).
+
+> ⚖️ **Honestly.** On ordinary small fixes it scores the same as plain codex (it just spends
+> more tokens). Ultracode is **not** a "raise accuracy everywhere" tool — it is a **"reduce
+> misses in large-scale exhaustive audits"** tool. Full numbers, methodology, and limitations
+> are all in the [benchmark section](#benchmarks--what-we-measured-directly) below.
+
+---
+
+Ultracode is a multi-agent workflow skillset for handling complex development work in Codex
+**more safely**. Instead of pushing a task through in one pass, the parent session clarifies
+the goal → splits the work → delegates to subagents when useful → and verifies the result with
+evidence and tests before integrating it.
+
+This repository adapts the Ultracode and workflow ideas used in Claude Code, re-built for
+Codex's skill/subagent environment. It is not an official port, nor a reimplementation of the
+Claude Code Workflow runtime. It reinterprets the same problem the Codex way.
+
+The honest one-line conclusion first — **Ultracode is not "a tool that makes ordinary code
+fixes better."** It shines at **"exhaustive audits where you must scan the whole codebase and
+miss nothing."** We prove that difference not with hand-waving but with this repo's own `bench/`
+measurements, laid out below on one page with no toggles.
+
+> **How to read this doc.** Junior developers can read top to bottom — it flows analogy →
+> measurements → usage. Senior / AI engineers can jump straight to the tables and **▸ Deep dive**
+> paragraphs in the "Benchmarks" section. Every number comes from `bench/REPORT.md` (cycles 1–8)
+> and the raw JSON.
+
+---
+
+## Background — things to know first
+
+For readers new to this, here are the core terms that recur throughout. Skip if you already
+know them.
+
+- **Codex** — OpenAI's coding-agent CLI (an AI coding tool you run in the terminal). It is the
+  "host" (the body that actually runs the plugin) this plugin rides on.
+- **Plugin / skill** — an extension that adds capability to Codex. A skill is a bundle of "work
+  this way" rules (a `SKILL.md` file); it does not run a program, it **layers rules onto the
+  instructions (prompt)** given to the AI. That is why it installs lightly and toggles easily.
+- **Agent / subagent** — an agent is one AI that reads files and runs commands on its own. A
+  subagent is a helper AI that the agent (parent) hands part of the work to.
+- **fan-out** — splitting one task across several subagents at once. Its opposite is **single
+  pass / solo** — one worker doing everything start to finish.
+- **token** — the smallest unit of text an AI reads and writes (roughly a word fragment). "Uses
+  more tokens" = the AI reads/thinks/writes more = costs more time and money.
+- **SWE-bench Pro** — a public benchmark (a standard exam of AI coding skill) that has AIs fix
+  bugs in real open-source repositories and grades them with **hidden tests**. Passing the tests
+  counts as "resolved." In this doc it represents "ordinary code fixes."
+
+Knowing these five is enough to read the benchmark section. Measurement terms like recall and
+false alarm are explained again in detail under
+[Three terms first](#three-terms-first).
+
+---
+
+## Benchmarks at a glance
+
+A summary of this repo's `bench/` measurements. Detailed tables and analysis are in the
+[Benchmarks](#benchmarks--what-we-measured-directly) section below.
+
+- **Single-fix accuracy — no gain (acknowledged).** On the industry-standard SWE-bench Pro, it
+  scores the same as plain codex (3/12, down to the same solved problems). Identical at
+  `medium`/`high`/`xhigh` reasoning effort. Neither deeper reasoning nor adding multiple agents
+  helps — because the failures are "information that was never provided (held-out)."
+- **Full-audit completeness — measured gain.** On finding deliberately planted bugs, recall was
+  higher than a single pass (91.3% → 97.8%, +6.5 pts). And **the gap explodes as code volume
+  grows** (at 13,460 lines, 69.6% → 95.7%, **+12 bugs**).
+- **Key distinction — the variable that grows the advantage is "code volume," not "file count."**
+  Growing to 24 small files left the advantage at noise (+1 bug), but inflating those same 24
+  files to 13,460 lines made it explode.
+- **Cost — more tokens.** Ultracode uses ~1.1× solo's tokens; raising effort costs up to ~2.3×.
+  False positives also rise from 5 to 28.
+
+```text
+request
+ → classify the task
+ → plan
+ → split into discovery / implementation / verification
+ → delegate to subagents when useful
+ → parent integrates with evidence and tests
+ → final report
+```
+
+---
+
+## What this skillset is
+
+Ultracode is **not** a binary or a separate runtime (an independently running execution engine).
+
+- It is a `SKILL.md`-based skillset that Codex reads.
+- It is an operating procedure for planning, decomposition, delegation, and verification.
+- It combines Codex-native agents, slash commands, MCP, review, and sandbox policy.
+- It is meant to be used only when explicitly invoked with `$ultracode`.
+
+Ultracode's boundaries are equally clear.
+
+- It is not an official OpenAI, Claude, or Google feature.
+- It does not implement the Claude Code Workflow runtime.
+- It does not provide a JavaScript/Python runner.
+- It does not bundle MCP servers, browser-automation servers, or deployment tools.
+
+A skill is ultimately **context injection**. It layers "work this way" operating rules
+(`SKILL.md`) onto a Codex session, so it toggles on and off with a single prompt line, no
+separate program to install.
+
+---
+
+## Why you need this
+
+Small changes are better done directly. A typo, a one-file summary, a single command — none of
+these need Ultracode.
+
+The problem is **a habit that shows up when one AI scans large code alone.** AI tends to stop
+once it judges "I've seen enough" (satisficing), and its attention fades toward the end of long
+input (attention decay). So a subtle bug buried deep in a big file simply gets skipped. The
+measurements below show exactly this in numbers (at 13,460 lines, single-pass recall collapses
+from 91% to 69.6%).
+
+Ultracode fits **tasks where missing something is expensive**:
+
+- implementing a feature that requires understanding the whole repository first
+- debugging a flaky issue with several candidate causes
+- a long, spec-driven implementation
+- high-risk changes such as auth, payments, or data migration
+- changes touching code, tests, and docs together
+- independently verifying a pull request before merge
+- adversarially checking "did we really miss nothing?"
+
+The core value is **confidence**, not speed. One session does not decide alone; it splits the
+work, gathers independent evidence, and the parent session owns the final integration.
+
+---
+
+## The two methods Ultracode uses (by analogy)
+
+For hard problems Ultracode pulls two levers.
+
+1. **Make one worker think longer** — raise Codex's reasoning effort
+   (`model_reasoning_effort`) up to `xhigh`. Codex defaults to `medium` and recommends `xhigh`
+   for hard, latency-tolerant tasks.
+2. **Split the work across several workers and merge** — divide the task among subagents that
+   each study their part deeply, then combine. Subagents are a native Codex feature (built-in
+   `default`/`worker`/`explorer` agents). This split-and-merge approach is the dynamic workflow
+   (multi-agent) method.
+
+Both share one principle: **the more an AI thinks (the more "tokens" it spends), the better the
+result.** (Research shows ~80% of the performance difference is explained by how many tokens
+were spent.)
+
+> **⚠️ Honest source attribution.** The `xhigh` reasoning mode and subagents are **native Codex
+> features** (see the official docs below). Organizing them into a *skill-driven workflow*
+> follows **Claude Code Workflow**, and figures like "~80% of variance explained by tokens" are
+> **Anthropic's multi-agent research results** — not numbers codex-ultracode re-measured on
+> Codex. Only the figures in the "Benchmarks" section are this repo's own measurements.
+
+**▸ Deep dive (for AI engineers).** The two levers are two axes of **test-time compute**. Lever 1
+(`xhigh`) increases one policy's *sequential* reasoning depth (reasoning-token budget); lever 2
+(subagents) increases *parallel* sample count and effective context. Anthropic's "~80% of
+variance explained by token usage" is one slice of the test-time scaling curve — both axes ride
+the same curve in different directions. But per-axis marginal utility shifts sharply with the
+task's **decomposability** and **verifiability** (measured below); it is not unconditionally
+monotonic. Cost model: subagents do not share context, so coordination plus per-agent tokens
+compound to as much as ~15× tokens (Anthropic's figure).
+
+---
+
+## Benchmarks — what we measured directly
+
+This is the core. We answer "is Ultracode good or not?" with numbers, not vibes.
+
+### Three terms first
+
+- **recall (share found):** of the hidden bugs, how many were actually found. Higher = "missed
+  less."
+- **false positive (FP, false alarm):** reporting something as a problem when it is not. Lower =
+  better.
+- **held-out answer:** the answer used only for grading and never shown to the AI — e.g. the
+  *exact* error string a grading test requires. Information not given to the AI.
+
+### How we measured (setup)
+
+To trust the numbers, you need to know how they were taken.
+
+- **Single-fix measurement (cycles 1–4, 8 / SWE-bench Pro A/B):** base = `codex` CLI **0.133.0**.
+  Cycles 1–4 did not pin model/effort in the harness → codex defaults (`medium`). Cycle 8 pinned
+  `model_reasoning_effort` to medium/high/xhigh explicitly. `approval_policy="never"` (runs to
+  the end with no mid-run approval), `workspace-write` (a sandbox allowing writes only in the
+  work folder), generation timeout 420–600 s. Grading = the **official Scale harness (grading
+  program) `swe_bench_pro_eval.py` (the `jefzda` images) run on Modal (a cloud that runs code in
+  isolation)**. "resolved" = both `FAIL_TO_PASS` (tests that must fail before and pass after the
+  fix) and `PASS_TO_PASS` (tests that already passed and must not break) **all pass**.
+- **Full-audit measurement (cycles 5–7 / recall):** both arms = **Claude Opus 4.8** (the session
+  model), effort = **xhigh** (workflow subagents inherit the main-loop model/effort). A separate
+  agent grades **blind** (without knowing the answers, matching findings against the
+  ground truth [answer key]).
+- Dataset: `ScaleAI/SWE-bench_Pro` (test split = the graded problem set), strided (sampled evenly
+  across the whole set) n=12. Audit fixtures (fixture = test code with bugs deliberately planted):
+  `bench/recall/fixtures/`.
+
+> Note: the SKILL itself was tuned by benchmark. The early 560-line "max fan-out, ignore cost"
+> skill was only **~7× slower** than plain codex on simple coding; rewriting it on evidence into
+> 74 lines ("verify thoroughly, fan out by value") delivered **the same accuracy ~6× cheaper**
+> (233 s → 39 s) (cycle 1). So today's skill is the result of measuring away the "expensive-only"
+> version.
+
+### Result 1 — ordinary code fixes → identical score (acknowledged)
+
+Run the industry-standard SWE-bench Pro 12 problems through the real grader, and ultracode on or
+off gave the same result: the same 3 of 12 solved, **down to the same failing problems.**
+
+```mermaid
+xychart-beta
+    title "SWE-bench Pro 12 problems - solved (ordinary tasks): identical"
+    x-axis ["plain codex", "ultracode"]
+    y-axis "solved (out of 12)" 0 --> 12
+    bar [3, 3]
+```
+
+| Method | Solved |
+| --- | --- |
+| plain codex (solo) | 3 / 12 |
+| ultracode | 3 / 12 (identical, same problems) |
+
+The 3 solved: `NodeBB-04998908` (js), `internetarchive/openlibrary-92db3454` (py),
+`qutebrowser-34a13afd` (py). The multi-agent levers — best-of-N (generate several candidate
+answers and pick the best) + independent adversarial verification (another AI tries to refute it)
++ repair (fix only the refuted part) — fired with **real codex subprocesses** in cycle 4's `orch`
+arm (orchestration arm) also gave an identical result: 0 newly solved, 0 previously-solved
+broken, only 5–8× the cost.
+
+**Why no difference?** These problems fail because of a *held-out answer* — like the exact error
+string a grading test wants — that is never given to the AI. **You cannot recover information
+that was not provided, no matter how many AIs you add.** So on ordinary single fixes, **ultracode
+only spends more tokens for the same score.** We acknowledge this plainly.
+
+**▸ Deep dive.** This tie is an **information ceiling** (a limit you cannot beat however well you
+solve), not an orchestration (dividing and coordinating multiple agents) failure. SWE-bench Pro's
+decision signal (e.g. `FAIL_TO_PASS`'s `assert.EqualError`) is a held-out spec absent from the
+agent's observable inputs, so the task is underdetermined (the given info doesn't narrow to one
+answer) from inputs alone. Fan-out / adversarial verify / best-of-N reduce **uncertainty you can
+search away (epistemic — resolved by learning more)**, but these failures are **irreducible
+ambiguity (aleatoric — unsearchable)**. best-of-N also needs a **valid selector (in-distribution
+oracle, e.g. rich `PASS_TO_PASS`)** to pick the right candidate, and Pro instances often lack one
+(flipt `pass_to_pass=[]`). Confirmed against flipt's gold patch (the reference answer the dataset
+ships): the agent emitted a semantically-equivalent but lexically different error string, so
+byte-exact matching (every character must match) failed.
+
+Evidence: `bench/REPORT.md` (cycles 3·3b·4) · raw data `bench/results_pro12.json`,
+`bench/results_orch12.json`, `bench/preds12/`.
+
+### Result 2 — deeper reasoning (higher effort) doesn't change it, only more tokens
+
+To answer the natural doubt "wouldn't higher effort change things?", we measured medium/high/xhigh
+× {solo, ultracode} — 6 conditions — on SWE-bench Pro's 10 instances (ansible 2 excluded) (cycle 8).
+
+```mermaid
+xychart-beta
+    title "resolved: 3/10 across all conditions (neither effort nor skill helps)"
+    x-axis ["med-solo", "med-ultra", "high-solo", "high-ultra", "xhi-solo", "xhi-ultra"]
+    y-axis "resolved / 10" 0 --> 10
+    bar [3, 3, 3, 3, 3, 3]
+```
+
+```mermaid
+xychart-beta
+    title "avg tokens (M) by effort - bar=ultracode, line=solo: more effort, only more cost"
+    x-axis ["medium", "high", "xhigh"]
+    y-axis "avg tokens (millions)" 0 --> 4
+    bar [1.49, 2.13, 3.10]
+    line [1.37, 1.82, 3.17]
+```
+
+| effort | arm | resolved | avg tokens (total) |
+| --- | --- | :-: | --: |
+| medium | solo | 3/10 | 1.37M |
+| medium | ultracode | 3/10 | 1.49M |
+| high | solo | 3/10 | 1.82M |
+| high | ultracode | 3/10 | 2.13M |
+| xhigh | solo | 3/10 | 3.17M |
+| xhigh | ultracode | 3/10 | 3.10M |
+
+All 6 conditions resolved **3/10, the same instances**. Raising effort medium → xhigh costs ~2.3×
+the tokens with zero accuracy change, and ultracode ties solo at every effort (only 1.08–1.16×
+more tokens, paired [matched per-problem]). **Result 1's information ceiling holds on the effort
+axis too** — more reasoning, or the skill, cannot manufacture information that isn't there. Both
+levers only spend more tokens.
+
+Evidence: `bench/REPORT.md` (cycle 8) · raw data `bench/results_medium.json`,
+`bench/results_high.json`, `bench/results_xhigh.json`.
+
+### Result 3 — finding every defect across the codebase → it wins here
+
+Conversely, on "miss-one-and-you-fail" tasks, ultracode finds more. Across 3 codebases with
+deliberately planted bugs (46 total), we compared **one worker scanning in a single pass** vs
+**several AIs splitting, scanning, and merging** (cycle 5).
+
+```mermaid
+xychart-beta
+    title "Full audit - % of bugs found (higher is better): ultracode wins"
+    x-axis ["single pass", "ultracode (split)"]
+    y-axis "found %" 0 --> 100
+    bar [91.3, 97.8]
+```
+
+```mermaid
+xychart-beta
+    title "Full audit - false alarms (lower is better): ultracode cost"
+    x-axis ["single pass", "ultracode (split)"]
+    y-axis "false positives" 0 --> 30
+    bar [5, 28]
+```
+
+| Metric | single pass | ultracode (split) | Meaning |
+| --- | --- | --- | --- |
+| recall (found) | 42 of 46 (91.3%) | 45 of 46 (97.8%) | ultracode **misses fewer bugs** |
+| false positives (FP) | 5 | 28 | ultracode **has more false alarms** |
+
+Per fixture, the advantage turns out to be **conditional**:
+
+| Fixture (domain) | planted | solo recall | ultra recall | solo FP | ultra FP |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| utils (subtle bugs) | 18 | 15/18 | 17/18 | 5 | 16 |
+| http (obvious security bugs) | 14 | 14/14 | 14/14 | 0 | 8 |
+| collections (mixed) | 14 | 13/14 | 14/14 | 0 | 4 |
+| **total** | **46** | **42 (91.3%)** | **45 (97.8%)** | **5** | **28** |
+
+**In plain terms:** a worker scanning alone tends to stop at "good enough" and miss subtle bugs
+(utils). Splitting across several AIs catches those, raising recall **91.3% → 97.8%**. But the
+advantage appears *only when bugs are subtle*. Obvious bugs like SQL injection (http) are already
+all caught in a single pass (14/14), so the gain is zero. And the cost: **false alarms rose 5 → 28
+(5.6×), consistently across every trial.** So ultracode's benefit is "missing nothing," and its
+cost is "more false alarms to triage."
+
+> **This matches Codex's own docs.** Codex's subagents documentation says subagents suit "complex
+> tasks that are highly parallel, such as codebase exploration" and "auditing numerous similar
+> items," and that "subagent workflows consume more tokens than comparable single-agent runs" —
+> exactly our two measured results: better at finding bugs in a full audit, at a higher
+> token/false-alarm cost.
+
+**▸ Deep dive.** This is a detection-task **recall (share of real bugs found) – precision (share
+of reports that are real) tradeoff**. Fan-out preserves per-chunk attention, mitigating
+single-pass satisficing (stopping early at "good enough") and attention decay (fading attention
+toward the end) to raise recall — but the completeness critic also raises the false-discovery rate
+(share of reports that are junk); F1 (a combined recall-and-precision score) actually favors solo
+at these sizes. The optimal operating point is set by **cost asymmetry**: when miss-cost >>
+triage-cost (the cost of vetting false alarms) — security/compliance audits — the high-recall
+setting is justified; otherwise solo wins. Hence the SKILL routes breadth fan-out output through a
+**generator/verifier split** (separate finder and refuter AIs, with an adversarial-verify gate
+defaulting to "not a real issue") before reporting, clawing back part of the precision loss.
+
+Evidence: `bench/REPORT.md` (cycle 5) · `bench/recall/README.md` · fixtures
+`bench/recall/fixtures/`.
+
+### Result 4 — what grows the advantage is "code volume," not "file count"
+
+This is the most important finding. Intuitively you'd think "more files → a single pass struggles
+more → fan-out wins," but **the measurements refuted that hypothesis.**
+
+First we merged cycle 5's 3 codebases (46 bugs) into one codebase of **24 files / just 188 lines**
+(cycle 6).
+
+| Metric | solo | ultracode (fan-out) |
+| --- | :-: | :-: |
+| recall | 43/46 (93.5%) | 44/46 (95.7%) |
+| found | 46 | 72 |
+| false positives (FP) | 6 | 10 |
+
+Growing 9 → 24 files did not grow the advantage; it **shrank to noise (+1 bug).** At 188 total
+lines everything still fits one context, so "more files" alone does not break a single pass.
+
+So next we buried those same 24 files under ~560 lines each of clean filler (volume of correct,
+bug-free code), inflating to **24 files / 13,460 lines (~107K tokens)**, and measured again (cycle 7).
+
+```mermaid
+xychart-beta
+    title "At 13,460 lines - % of bugs found: solo collapses, fan-out holds"
+    x-axis ["single pass", "ultracode (split)"]
+    y-axis "found %" 0 --> 100
+    bar [69.6, 95.7]
+```
+
+| Metric | solo | ultracode (fan-out) |
+| --- | :-: | :-: |
+| recall | 32/46 (**69.6%**) | 44/46 (95.7%) |
+| found | 33 | 60 |
+| false positives (FP) | 2 | 13 |
+
+As volume grew 188 → 13,460 lines, **solo recall collapsed from 91–93% to 69.6%** while fan-out
+held at 95.7%. The advantage exploded from +1 bug to **+12 bugs (+26.1 pts)**. The single pass
+scans ~107K tokens at once and satisfices → it bulk-misses bugs buried in big files, whereas
+fan-out keeps recall because each agent reads only ~1,680 lines deeply.
+
+**Key distinction (cycle 6 vs 7):** the variable that grows the fan-out advantage is **"volume
+(amount of code)," not "file count."**
+
+```mermaid
+xychart-beta
+    title "As volume grows, the fan-out advantage (+bugs) explodes"
+    x-axis ["separate 9 files", "merged 24 files/188 ln", "merged 24 files/13460 ln"]
+    y-axis "extra bugs ultracode found" 0 --> 14
+    bar [3, 1, 12]
+```
+
+**▸ Deep dive / honest limit.** 107K tokens is large but within Opus's context window (200K+), so
+it is not a "hard window overflow" — the model can read it all, but attention spread thin over the
+large volume. The trend (188 lines +1 bug → 13,460 lines +12 bugs) strongly supports "the larger
+the volume, the bigger the fan-out edge," and a true window overflow (>200K tokens) is expected to
+widen it further — but **that regime is unmeasured**, supported only by the borrowed principle
+(Claude) and left for us to measure.
+
+Evidence: `bench/REPORT.md` (cycles 6·7) · `bench/recall/README.md`.
+
+### Honest limits (threats to validity)
+
+To avoid over-reading the numbers, here are the weaknesses as they are.
+
+- **One trial per condition.** LLMs are nondeterministic, so the same input wobbles. Small
+  absolute margins (especially cycles 5·6's +1–3 bugs) should be read as directional only. Cycle
+  7's +12 bugs has a large enough margin to be relatively robust.
+- **Synthetic codebases.** The audit fixtures are artificial code with planted bugs; the
+  distribution may differ from real production code.
+- **True context-overflow is unverified.** The regime expected to show the biggest advantage
+  (>200K tokens) was not measured (see the ▸ deep dive above).
+- **Single-fix measured on codex.** Cycles 1–4·8 used the codex CLI, cycles 5–7 used Claude Opus.
+  Absolute numbers may shift with a different host model (relative comparison is valid because
+  each arm used the same model internally).
+
+### Summary — when it's worth it
+
+| Task type | Our benchmark result | Verdict |
+| --- | --- | --- |
+| Ordinary single fix | identical score (any effort) | **Not worth it (only more tokens)** |
+| Miss-nothing full audit / review | finds more (+6.5 pts) | **Worth it (but accept more false alarms)** |
+| Many files (24 files / 188 lines) | advantage is noise (+1 bug); FP cost persists | **File count alone does not grow it** (cycle 6) |
+| Large volume (24 files / 13,460 lines / ~107K tokens) | solo recall 91–93% **collapses to 69.6%**; fan-out holds 95.7% | **The advantage explodes with volume** (+12 bugs, cycle 7) |
+| True window overflow (>200K tokens) | not measured — trend predicts a wider gap | **unverified** |
+
+In one sentence: **the advantage codex-ultracode proved with benchmarks is "missing fewer bugs in
+a large-scale full audit"; on ordinary tasks the score is the same.**
+
+---
+
+## Pros and cons
+
+The tradeoffs follow directly from the benchmarks.
+
+**Pros**
+
+- **Fewer misses in large-scale code audits.** The bigger the volume (at 13,460 lines, 95.7% vs a
+  single pass's 69.6%) the wider the gap. Strong for high-miss-cost security/compliance/pre-release audits.
+- **Verification discipline is enforced.** A claim counts only with "the executed command + its
+  output"; bugs must be reproduced before fixing; the gate requires fixing the contract/root cause,
+  not the symptom.
+- **It blocks overconfidence.** The parent session does not trust subagent results blindly; it
+  re-verifies with evidence and leaves unverified items marked "unverified" in the report.
+- **Easy to toggle.** Not a runtime install — explicit invocation with one prompt line
+  (`$ultracode`).
+
+**Cons**
+
+- **It does not raise ordinary-task accuracy.** Ties plain codex on SWE-bench Pro regardless of
+  effort or skill. A token waste on single fixes.
+- **More false alarms.** The price of higher recall is false positives rising 5 → 28 (~5.6×) —
+  a triage cost.
+- **High token cost.** ~1.1× solo, up to ~2.3× when effort is raised; multi-agent fan-out costs
+  more (up to ~15× in principle).
+- **Counterproductive on small/coupled tasks.** Forcing a split on interdependent work adds cost
+  without accuracy gain, and the completeness critic manufactures noise.
+
+---
+
+## How it's built (architecture)
+
+Ultracode centers on "**the parent session owns the work and delegates only what's needed to
+subagents.**" The goal is not more subagents, but decomposing the work and verifying it from
+different angles.
+
+```mermaid
+flowchart TD
+    User["User request"] --> Parent["Parent Codex session"]
+    Parent --> Classify{"Classify task"}
+
+    Classify -->|small and clear| Direct["Direct mode"]
+    Classify -->|needs phases| Workflow["Workflow mode"]
+    Classify -->|independent delegation| Delegated["Delegated mode"]
+
+    Direct --> NarrowCheck["Narrow verification"]
+
+    Workflow --> Plan["plan.md / orchestration.md"]
+    Plan --> Packets["Write packets"]
+    Packets --> ParentPass["Parent executes per packet"]
+
+    Delegated --> DPlan["Plan and write packets"]
+    DPlan --> Agents["Subagent fan-out"]
+    Agents --> Results["Collect results"]
+
+    ParentPass --> Integration["Parent integration"]
+    Results --> Integration
+    NarrowCheck --> Report["Final report"]
+
+    Integration --> Verify["Tests / review / adversarial checks"]
+    Verify --> Report
+```
+
+The components:
+
+- **Parent session:** classifies the task, plans, integrates, and makes the final call.
+- **packet:** a small unit of work that can be done independently — discovery, implementation,
+  verification.
+- **Subagent:** takes a packet and investigates or verifies independently. If unavailable, the
+  parent session runs the phases itself.
+- **artifact:** records of the run such as `plan.md`, `orchestration.md`, `state.json`, and
+  packet/result files. In Codex they are written under
+  `${CODEX_HOME:-$HOME/.codex}/log/ultracode/` by default, along with `metrics.json` and
+  `summary.jsonl` for later improvement analysis.
+- **adversarial verify:** a step that assumes the conclusion is wrong and re-checks it. Independent
+  skeptics start from "default: not a real issue" and decide by majority, with rounds capped at 2
+  to prevent drift.
+
+When Codex-native subagents are available, `Delegated mode` is the fullest form. When they are
+absent or blocked, `Workflow mode` reproduces the same procedure within a single session and
+**records why it did not delegate** in the final report. Tiny tasks go straight to `Direct mode`.
+
+---
+
+## Execution modes
+
+Ultracode operates in three ways depending on task size and environment.
+
+| Mode | When | Behavior |
+| --- | --- | --- |
+| **Direct mode** | small, clear task (one typo, an obvious one-line fix) | Parent handles it directly and runs the narrowest real check. No artifacts. |
+| **Single loop (default for coding)** | most code changes (edits depend on each other) | One agent: localize (pinpoint the bug) → write a failing test → fix the root cause → run real tests → debug until green. Captures most of the quality gain at no multi-agent cost. |
+| **Delegated fan-out** | subtasks are genuinely independent (disjoint files/modules, breadth-first [search wide] discovery, an independent verification pass) | Split discovery/implementation/verification packets (units of work) across subagents; parent integrates. Isolate with a worktree (a git working copy — a cloned repo in a separate folder) when parallel writers could collide. |
+
+The point is **"choose the mode by task shape, not ambition."** Forcing a split on a single
+coherent fix only adds cost; fan-out pays off only on genuinely decomposable breadth work (the
+benchmarks above show exactly this boundary).
+
+---
+
+## Installation
+
+This repository follows the Codex plugin layout. Installing it as a plugin loads
+`skills/ultracode` as a Codex skill.
+
+For normal use, register the GitHub repo as a Codex marketplace, then install the plugin.
+
+```bash
+codex plugin marketplace add Jimmy-Jung/codex-ultracode --ref main
+codex plugin add codex-ultracode@codex-ultracode --json
+```
+
+Check the install:
+
+```bash
+codex plugin list --json
+```
+
+To use it in just one project instead of installing the plugin, copy only the skill folder into
+that project's `.agents/skills/`.
+
+```bash
+mkdir -p your-project/.agents/skills
+cp -R skills/ultracode your-project/.agents/skills/ultracode
+```
+
+To use it like a personal skill across projects, copy it into your user skills folder.
+
+```bash
+mkdir -p ~/.agents/skills
+cp -R skills/ultracode ~/.agents/skills/ultracode
+```
+
+After installing, open a fresh Codex session and invoke it explicitly.
+
+```text
+Use $ultracode to debug an intermittent login failure.
+```
+
+`skills/ultracode/agents/openai.yaml` uses `allow_implicit_invocation: false`. That is, it does
+not take over ordinary work automatically; it activates only when you call it explicitly with
+`$ultracode`, `ultracode`, or `ultra code`.
+
+---
+
+## How to use
+
+The best request states **goal, scope, mode, constraints, and required checks**.
+
+```text
+Use $ultracode to <goal>.
+Scope: <files, modules, repo area>.
+Mode: <read-only audit | plan first | implement after discovery | verify only>.
+Constraints: <no edits, no commits, ask before broad changes, etc.>.
+Required checks: <tests, build, lint, docs parity, etc.>.
+Output: <desired result format>.
+```
+
+If the request is vague, Ultracode does not immediately make broad edits.
+
+```text
+Use $ultracode to improve this.
+```
+
+For input like that, it asks one short clarifying question, or proposes a safer rewritten prompt.
+If the target is clear but the scope is broad, it first gathers evidence with read-only discovery.
+
+Below are requests that work well in practice.
+
+### Verifying a risky change before a pull request
+
+```text
+Use $ultracode to verify the payment-module changes before a pull request.
+Scope: changed files, payment tests, payment API boundaries.
+Mode: verify only.
+Constraints: do not edit files, do not commit.
+Required checks: missing edge cases, security risks, regression risk, test evidence.
+Output: blocking issues, recommended fixes, residual risk.
+```
+
+### Complex debugging
+
+```text
+Use $ultracode to debug an intermittent login failure.
+Scope: auth module, session handling, login-related tests.
+Mode: investigate, then implement.
+Constraints: lay out cause hypotheses first; confirm before any broad change.
+Required checks: reproduction path, log/test evidence, regression test after the fix.
+Output: cause, fix scope, changes, verification results, residual risk.
+```
+
+### Long, spec-driven implementation
+
+```text
+Use $ultracode to implement payment v2 per specs/payment-v2-spec.md.
+Scope: payment domain, API, tests, related docs.
+Mode: investigate, then implement.
+Constraints: report any existing behavior that conflicts with the spec; do not commit or push.
+Required checks: per-spec-item coverage, unit tests, integration tests, security review.
+Output: spec checklist, changed files, verification results, open items.
+```
+
+### Large-codebase exhaustive audit (the benchmark-proven use case)
+
+```text
+Use $ultracode to find every security/correctness defect across this whole repository.
+Scope: all of src/ (large), related tests.
+Mode: read-only audit. Split by file, study each deeply, then merge.
+Constraints: do not edit. Filter findings through adversarial verification before reporting.
+Required checks: file·line·reproduction evidence per finding. Skeptical re-check defaulting to "not a real issue".
+Output: confirmed issues (with evidence) first, then uncertain items.
+```
+
+### Understanding structure before implementing
+
+```text
+Use $ultracode to map how the current auth flow works.
+Scope: auth module and related middleware.
+Mode: plan first.
+Constraints: do not edit files yet.
+Required checks: trace the request flow from route to repository layer.
+Output: an implementation plan including risk factors.
+```
+
+---
+
+## Safety principles
+
+Because Ultracode is a strong work mode, it treats side effects conservatively.
+
+- It does not run automatically without explicit invocation.
+- Commits, pushes, deploys, publishing, and external-resource changes require explicit user request.
+- It confirms first before deletion, broad rewrites, credential changes, or production data access.
+- It does not trust subagent results blindly; the parent session verifies with evidence and tests.
+- It reports skipped verification honestly in the final report.
+- The default workspace-write sandbox usually has the network off. Batch install/network steps
+  behind the approval flow rather than retrying blindly (blocked network calls fail silently and
+  waste the run).
+
+---
+
+## When not to use it
+
+Ultracode is overkill for:
+
+- a single typo fix
+- a small wording change in one file
+- a one-line fix with a known scope and cause
+- a simple command
+- a quick conversational question
+
+For these, the normal Codex flow is faster and clearer. As the benchmarks show, on
+single/coupled tasks ultracode only spends more tokens for the same score.
+
+---
+
+## Optional Codex surfaces used
+
+Ultracode is not a separate runtime; it combines Codex's current features. It uses the surfaces
+below only when available, and records a skip reason and proceeds with the nearest safe
+alternative otherwise.
+
+- `/permissions`: separates read-only discovery from bounded implementation.
+- `/diff`: reviews changes before final integration.
+- `/review` or a reviewer subagent: performs independent adversarial verification.
+- `/status`: checks permissions, change state, and run state.
+- `/mcp`: checks availability of external tools (MCP, external capabilities connected via the
+  Model Context Protocol) such as docs, browser, or GitHub.
+- `codex exec`: only for user-requested CI dry runs or non-interactive reports.
+
+---
+
+## Repository layout
+
+```text
+./
+  .agents/plugins/marketplace.json   # manifest to register this repo as a Codex marketplace
+  .codex-plugin/plugin.json          # Codex plugin manifest
+  CHANGELOG.md                       # user-facing change log
+  README.md                          # this public intro document
+  scripts/ultracode-doctor-logs.mjs  # tool to inspect Ultracode logs / finalization telemetry
+  skills/ultracode/
+    SKILL.md                         # the actual skill rules (the canonical doc Codex follows)
+    agents/openai.yaml               # display name, default prompts, explicit-invocation policy
+    references/                      # packet schema, approval gates, execution examples, eval contracts
+  bench/                             # benchmark harness · results · analysis (source of every number here)
+    REPORT.md                        # measurement report, cycles 1–8 (canonical)
+    recall/                          # full-audit recall harness + fixtures
+    results_*.json, preds*/          # raw data
+```
+
+`skills/ultracode/references/js-runner.md` keeps its historical filename but is not a real
+JavaScript runner. It is an adapter document mapping Codex-native subagents and operating surfaces
+to Claude Workflow concepts.
+
+The README is introductory. The canonical operating rules are in `skills/ultracode/SKILL.md`, and
+the canonical source of every benchmark number is `bench/REPORT.md`.
+
+---
+
+## Log doctor
+
+Since `0.2.1`, the repo includes a helper that inspects Ultracode run artifacts. It reads only the
+Ultracode-owned logs under `${CODEX_HOME:-$HOME/.codex}/log/ultracode`; it does not read Codex's
+private session logs, `history.jsonl`, `session_index.jsonl`, or SQLite databases.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.1 --json
+```
+
+To inspect an installed plugin cache from another project, point at the plugin root by absolute
+path.
+
+```bash
+PLUGIN_ROOT="${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-ultracode/codex-ultracode/1.0.1"
+node "$PLUGIN_ROOT/scripts/ultracode-doctor-logs.mjs" --plugin-version 1.0.1 --json
+```
+
+As a release gate (a gate that blocks before shipping) over completed runs only, use
+`--terminal-only` together with `--fail-on warning`.
+
+```bash
+node scripts/ultracode-doctor-logs.mjs --plugin-version 1.0.1 --terminal-only --fail-on warning --json
+```
+
+Main checks: whether `state.json`/`metrics.json` parse, required artifacts exist, the status enum
+is valid, completed runs have a matching `summary.jsonl` record, `summary_append_ok=true` was
+written only after re-reading the summary, `0.2.1+` runs' plugin metadata matches, and timeout
+attempts are recorded separately from the eventual reviewer/parent-review success. JSON output
+includes `terminal_metrics_checked`, `nonterminal_metrics_skipped`, `warnings_by_code`, and
+`errors_by_code`.
+
+---
+
+## Sources
+
+**Codex official docs**
+- Config reference (`model_reasoning_effort`): <https://developers.openai.com/codex/config-reference>
+- CLI: <https://developers.openai.com/codex/cli>
+- Subagents: <https://developers.openai.com/codex/subagents>
+- Best practices: <https://developers.openai.com/codex/learn/best-practices>
+
+**Borrowed principle (Claude / Anthropic)**
+- Claude effort docs: <https://platform.claude.com/docs/en/build-with-claude/effort>
+- Anthropic multi-agent research: <https://www.anthropic.com/engineering/multi-agent-research-system>
+
+**What this repo measured directly**
+- Canonical report: `bench/REPORT.md` (cycles 1–8)
+- Full-audit harness: `bench/recall/README.md`
+- Raw data: `bench/results_*.json`, `bench/preds12/`, `bench/preds_orch/`
+
+---
+
+## Further reading
+
+Recommended first-read order:
+
+1. `README.md` (this document)
+2. `bench/REPORT.md` — the source of every number
+3. `skills/ultracode/SKILL.md` — the canonical operating rules agents follow
+4. `skills/ultracode/references/execution-examples.md`
+5. `skills/ultracode/references/packet-schema.md`
+6. `skills/ultracode/references/approval-gates.md`
+7. `skills/ultracode/references/eval-contracts.md`
+8. `skills/ultracode/references/forward-testing.md`
+9. `CHANGELOG.md`
+
+---
+
+## License
+
+MIT License. See `LICENSE` for details.
